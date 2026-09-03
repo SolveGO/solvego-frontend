@@ -1,0 +1,32 @@
+.problem-card {
+    display: block;
+    padding: 20px 24px;
+
+    color: var(--ink-black);
+    text-decoration: none;
+
+    background: var(--white);
+    border: 1px solid var(--alabaster-grey);
+    border-radius: 10px;
+}
+
+.problem-card:hover {
+    background: #f7f8fa;
+    border-color: var(--lavender-grey);
+}
+
+.problem-number {
+    font-size: 14px;
+    color: var(--lavender-grey);
+}
+
+.problem-title {
+    margin: 8px 0;
+    font-size: 20px;
+}
+
+.problem-creator {
+    margin: 0;
+    font-size: 14px;
+    color: var(--dusk-blue);
+}

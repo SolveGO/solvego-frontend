@@ -1,0 +1,84 @@
+.problem-detail-page {
+    max-width: 900px;
+}
+
+.problem-header {
+    margin-bottom: 32px;
+}
+
+.problem-detail-number {
+    font-size: 14px;
+    color: var(--lavender-grey);
+}
+
+.problem-header h1 {
+    margin: 8px 0 12px;
+    font-size: 32px;
+    color: var(--ink-black);
+}
+
+.problem-author {
+    margin: 0 0 24px;
+    color: var(--dusk-blue);
+}
+
+.problem-description {
+    margin-bottom: 20px;
+    line-height: 1.6;
+    color: var(--dusk-blue);
+}
+
+.next-player {
+    font-size: 16px;
+    color: var(--ink-black);
+}
+
+.board-section {
+    margin: 32px 0;
+}
+
+.selected-position {
+    color: var(--dusk-blue);
+}
+
+.problem-actions {
+    margin-top: 24px;
+}
+.submit-button {
+    padding: 10px 24px;
+    border: none;
+    border-radius: 8px;
+
+    background: var(--prussian-blue);
+    color: var(--white);
+
+    font: inherit;
+    cursor: pointer;
+}
+.attempt-result {
+    margin-top: 16px;
+    font-weight: 600;
+    color: var(--ink-black);
+}
+
+.manage-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 24px;
+}
+
+.manage-actions button {
+    padding: 8px 16px;
+    color: var(--dusk-blue);
+    border: 1px solid var(--alabaster-grey);
+    border-radius: 8px;
+    background: var(--white);
+    font: inherit;
+    cursor: pointer;
+}
+
+.manage-actions button:hover {
+    color: var(--prussian-blue);
+    border-color: var(--lavender-grey);
+    background: #f7f8fa;
+}

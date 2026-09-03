@@ -1,0 +1,60 @@
+.problem-list-page {
+    max-width: 800px;
+}
+
+.problem-list-page > h1 {
+    margin-top: 0;
+    margin-bottom: 32px;
+}
+
+.problem-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+
+    margin-top: 32px;
+}
+.page-button {
+    min-width: 36px;
+    height: 36px;
+
+    padding: 0 10px;
+
+    color: var(--dusk-blue);
+    background: var(--white);
+
+    border: 1px solid var(--alabaster-grey);
+    border-radius: 6px;
+
+    font: inherit;
+    cursor: pointer;
+}
+
+.page-button:hover {
+    color: var(--prussian-blue);
+    border-color: var(--lavender-grey);
+    background: #f7f8fa;
+}
+
+.page-button.active {
+    color: var(--white);
+    background: var(--prussian-blue);
+    border-color: var(--prussian-blue);
+}
+
+.page-ellipsis {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    min-width: 28px;
+    height: 36px;
+
+    color: var(--lavender-grey);
+}

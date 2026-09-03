@@ -1,0 +1,45 @@
+.wrong-problem-page {
+    max-width: 800px;
+}
+
+.wrong-problem-page > h1 {
+    margin-top: 0;
+    margin-bottom: 32px;
+    color: var(--ink-black);
+}
+
+.wrong-problem-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.wrong-problem-card {
+    display: block;
+    padding: 20px 24px;
+    color: var(--ink-black);
+    text-decoration: none;
+    background: var(--white);
+    border: 1px solid var(--alabaster-grey);
+    border-radius: 10px;
+}
+
+.wrong-problem-card:hover {
+    background: #f7f8fa;
+    border-color: var(--lavender-grey);
+}
+
+.wrong-problem-number {
+    font-size: 14px;
+    color: var(--lavender-grey);
+}
+
+.wrong-problem-card h2 {
+    margin: 8px 0 0;
+    font-size: 20px;
+}
+
+.empty-message {
+    padding: 32px 0;
+    color: var(--dusk-blue);
+}

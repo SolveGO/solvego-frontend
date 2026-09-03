@@ -1,0 +1,105 @@
+.problem-form-page {
+    max-width: 900px;
+}
+
+.problem-form-page h1 {
+    margin-top: 0;
+    margin-bottom: 32px;
+    color: var(--ink-black);
+}
+
+.problem-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.problem-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.problem-form-field label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--dusk-blue);
+}
+
+.problem-form-field input,
+.problem-form-field textarea,
+.problem-form-field select {
+    padding: 12px 14px;
+    font: inherit;
+    border: 1px solid var(--alabaster-grey);
+    border-radius: 8px;
+    outline: none;
+}
+
+.problem-form-field textarea {
+    min-height: 120px;
+    resize: vertical;
+}
+
+.problem-form-field input:focus,
+.problem-form-field textarea:focus,
+.problem-form-field select:focus {
+    border-color: var(--dusk-blue);
+}
+
+.board-editor {
+    margin-top: 20px;
+}
+
+.board-editor h2 {
+    margin-bottom: 16px;
+    color: var(--ink-black);
+}
+
+.board-mode-buttons {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.board-mode-buttons button {
+    padding: 8px 14px;
+    color: var(--dusk-blue);
+    background: var(--white);
+    border: 1px solid var(--alabaster-grey);
+    border-radius: 8px;
+    font: inherit;
+    cursor: pointer;
+}
+
+.board-mode-buttons button:hover {
+    color: var(--prussian-blue);
+    border-color: var(--lavender-grey);
+    background: #f7f8fa;
+}
+
+.board-status,
+.board-info {
+    color: var(--dusk-blue);
+}
+
+.board-status {
+    margin: 12px 0 20px;
+}
+
+.board-info {
+    margin-top: 16px;
+    line-height: 1.7;
+}
+
+.problem-form-submit {
+    margin-top: 24px;
+    padding: 12px 24px;
+    background: var(--prussian-blue);
+    color: var(--white);
+    border: none;
+    border-radius: 8px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
