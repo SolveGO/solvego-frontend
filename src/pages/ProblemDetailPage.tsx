@@ -150,14 +150,9 @@ function ProblemDetailPage() {
                 blackStones={problem.blackStones}
                 whiteStones={problem.whiteStones}
                 selectedPosition={selectedPosition}
+                selectedStone={problem.nextPlayer}
                 onSelect={setSelectedPosition}
             />
-
-            {selectedPosition && (
-                <p className="selected-position">
-                    선택한 위치: ({selectedPosition.x}, {selectedPosition.y})
-                </p>
-            )}
 
             {isLoggedIn && (
                 <div className="problem-actions">

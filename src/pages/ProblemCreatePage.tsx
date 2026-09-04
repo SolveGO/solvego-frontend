@@ -155,6 +155,7 @@ function ProblemCreatePage() {
                 <GoBoard
                     blackStones={blackStones}
                     whiteStones={whiteStones}
+                    selectedPosition={answerPosition}
                     onSelect={handleBoardSelect}
                 />
 

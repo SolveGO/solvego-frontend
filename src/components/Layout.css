@@ -13,10 +13,21 @@
 }
 
 .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
     margin: 0 0 40px;
 
     font-size: 24px;
+    font-weight: bold;
     color: var(--prussian-blue);
+}
+
+.logo img {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
 }
 
 .sidebar-nav {
@@ -27,7 +38,7 @@
 
 .sidebar-nav a,
 .sidebar-nav button {
-    padding: 12px 14px;
+    padding: 12px 0;
 
     color: var(--dusk-blue);
 
@@ -45,7 +56,14 @@
 .sidebar-nav a:hover,
 .sidebar-nav button:hover {
     color: var(--prussian-blue);
-    background: var(--alabaster-grey);
+    background: rgba(119, 141, 169, 0.08);
+}
+
+/* 현재 페이지 */
+.sidebar-nav a.active {
+    color: var(--prussian-blue);
+    background: none;
+    font-weight: 700;
 }
 
 .content {

@@ -167,64 +167,76 @@ function ProblemEditPage() {
     }
 
     return (
-        <div>
+        <div className="problem-form-page">
             <h1>문제 수정</h1>
 
-            <div>
-                <label>제목</label>
-                <input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
+            <div className="problem-form">
+                <div className="problem-form-field">
+                    <label>제목</label>
+                    <input
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                    />
+                </div>
+
+                <div className="problem-form-field">
+                    <label>설명</label>
+                    <textarea
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                    />
+                </div>
+
+                <div className="problem-form-field">
+                    <label>다음 차례</label>
+                    <select
+                        value={nextPlayer}
+                        onChange={(e) =>
+                            setNextPlayer(e.target.value as NextPlayer)
+                        }>
+                        <option value="BLACK">흑</option>
+                        <option value="WHITE">백</option>
+                    </select>
+                </div>
+            </div>
+
+            <div className="board-editor">
+                <h2>바둑판 설정</h2>
+
+                <div className="board-mode-buttons">
+                    <button onClick={() => setBoardMode("BLACK")}>흑돌</button>
+
+                    <button onClick={() => setBoardMode("WHITE")}>백돌</button>
+
+                    <button onClick={() => setBoardMode("ERASE")}>
+                        지우기
+                    </button>
+
+                    <button onClick={() => setBoardMode("ANSWER")}>
+                        정답 위치
+                    </button>
+                </div>
+
+                <p className="board-status">현재 모드: {boardMode}</p>
+
+                <GoBoard
+                    blackStones={blackStones}
+                    whiteStones={whiteStones}
+                    selectedPosition={answerPosition}
+                    onSelect={handleBoardSelect}
                 />
+
+                <div className="board-info">
+                    <div>흑돌 개수: {blackStones.length}</div>
+                    <div>백돌 개수: {whiteStones.length}</div>
+
+                    {answerPosition && (
+                        <div>
+                            정답 위치: ({answerPosition.x}, {answerPosition.y})
+                        </div>
+                    )}
+                </div>
             </div>
-
-            <div>
-                <label>설명</label>
-                <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                />
-            </div>
-
-            <div>
-                <label>다음 차례</label>
-                <select
-                    value={nextPlayer}
-                    onChange={(e) =>
-                        setNextPlayer(e.target.value as NextPlayer)
-                    }>
-                    <option value="BLACK">흑</option>
-                    <option value="WHITE">백</option>
-                </select>
-            </div>
-
-            <h2>바둑판 설정</h2>
-
-            <div>
-                <button onClick={() => setBoardMode("BLACK")}>흑돌</button>
-                <button onClick={() => setBoardMode("WHITE")}>백돌</button>
-                <button onClick={() => setBoardMode("ERASE")}>지우기</button>
-                <button onClick={() => setBoardMode("ANSWER")}>
-                    정답 위치
-                </button>
-            </div>
-
-            <p>현재 모드: {boardMode}</p>
-
-            <GoBoard
-                blackStones={blackStones}
-                whiteStones={whiteStones}
-                onSelect={handleBoardSelect}
-            />
-
-            <p>흑돌 개수: {blackStones.length}</p>
-            <p>백돌 개수: {whiteStones.length}</p>
-
-            {answerPosition && (
-                <p>
-                    정답 위치: ({answerPosition.x}, {answerPosition.y})
-                </p>
-            )}
 
             <button
                 className="problem-form-submit"

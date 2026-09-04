@@ -113,3 +113,21 @@
     z-index: 2;
     pointer-events: none;
 }
+
+.star-point {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: #1a1a1a;
+    border-radius: 50%;
+
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+
+    z-index: 1;
+}
+
+.stone {
+    z-index: 2;
+}

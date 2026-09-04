@@ -9,6 +9,10 @@ type GoBoardProps = {
     blackStones: Position[];
     whiteStones: Position[];
     selectedPosition?: Position | null;
+
+    // 문제 풀이 화면에서만 전달
+    selectedStone?: "BLACK" | "WHITE";
+
     onSelect: (position: Position) => void;
 };
 
@@ -31,6 +35,9 @@ function GoBoard(props: GoBoardProps) {
                         props.selectedPosition?.x === x &&
                         props.selectedPosition?.y === y;
 
+                    const isStarPoint =
+                        [3, 9, 15].includes(x) && [3, 9, 15].includes(y);
+
                     return (
                         <button
                             key={`${x}-${y}`}
@@ -42,6 +49,8 @@ function GoBoard(props: GoBoardProps) {
                                 y === size - 1 ? "bottom-edge" : "",
                             ].join(" ")}
                             onClick={() => props.onSelect({ x, y })}>
+                            {isStarPoint && <span className="star-point" />}
+
                             {hasBlackStone && (
                                 <span className="stone black-stone" />
                             )}
@@ -50,7 +59,26 @@ function GoBoard(props: GoBoardProps) {
                                 <span className="stone white-stone" />
                             )}
 
-                            {isSelected && <span className="selected-marker" />}
+                            {isSelected &&
+                                !hasBlackStone &&
+                                !hasWhiteStone &&
+                                props.selectedStone === "BLACK" && (
+                                    <span className="stone black-stone" />
+                                )}
+
+                            {isSelected &&
+                                !hasBlackStone &&
+                                !hasWhiteStone &&
+                                props.selectedStone === "WHITE" && (
+                                    <span className="stone white-stone" />
+                                )}
+
+                            {isSelected &&
+                                !hasBlackStone &&
+                                !hasWhiteStone &&
+                                !props.selectedStone && (
+                                    <span className="selected-marker" />
+                                )}
                         </button>
                     );
                 }),

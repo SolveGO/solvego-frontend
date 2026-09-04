@@ -1,7 +1,6 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
-
 import ProblemListPage from "./pages/ProblemListPage";
 import ProblemDetailPage from "./pages/ProblemDetailPage";
 import LoginPage from "./pages/LoginPage";
@@ -14,15 +13,15 @@ function App() {
     return (
         <Routes>
             <Route element={<Layout />}>
-                <Route path="/problems" element={<ProblemListPage />} />
+                <Route path="/" element={<Navigate to="/problems" replace />} />
+                <Route path="/" element={<Navigate to="/problems" replace />} />
 
+                <Route path="/problems" element={<ProblemListPage />} />
                 <Route
                     path="/problems/:problemId"
                     element={<ProblemDetailPage />}
                 />
-
                 <Route path="/login" element={<LoginPage />} />
-
                 <Route path="/signup" element={<SignupPage />} />
 
                 <Route
