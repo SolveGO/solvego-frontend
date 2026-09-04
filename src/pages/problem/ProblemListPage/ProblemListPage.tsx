@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import ProblemCard from "../components/ProblemCard";
-import { API_BASE_URL } from "../api/api";
+import ProblemCard from "../../../components/ProblemCard/ProblemCard";
+import { API_BASE_URL } from "../../../api/api";
 import "./ProblemListPage.css";
 
 type Problem = {

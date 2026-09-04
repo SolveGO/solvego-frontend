@@ -1,8 +1,10 @@
 import { useContext, useEffect, useState } from "react";
-import GoBoard from "../components/GoBoard";
 import { useNavigate, useParams } from "react-router-dom";
-import AuthContext from "../contexts/AuthContext";
-import { API_BASE_URL, authFetch } from "../api/api";
+
+import GoBoard from "../../../components/GoBoard/GoBoard";
+import AuthContext from "../../../contexts/AuthContext";
+import { API_BASE_URL, authFetch } from "../../../api/api";
+
 import "./ProblemDetailPage.css";
 
 type Position = {

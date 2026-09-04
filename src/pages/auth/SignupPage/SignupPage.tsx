@@ -1,22 +1,20 @@
-import { useContext, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import AuthContext from "../contexts/AuthContext";
-import { API_BASE_URL } from "../api/api";
-import "./AuthPage.css";
+import { API_BASE_URL } from "../../../api/api";
+import "../AuthPage.css";
 
-type LoginResponse = {
-    accessToken: string;
+type SignupResponse = {
+    userId: number;
 };
 
-function LoginPage() {
+function SignupPage() {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
 
-    const { login } = useContext(AuthContext);
     const navigate = useNavigate();
 
-    async function handleLogin() {
-        const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    async function handleSignup() {
+        const response = await fetch(`${API_BASE_URL}/api/users`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -28,20 +26,27 @@ function LoginPage() {
         });
 
         if (!response.ok) {
-            alert("로그인에 실패했습니다.");
+            if (response.status === 409) {
+                alert("이미 사용 중인 아이디입니다.");
+                return;
+            }
+
+            alert("회원가입에 실패했습니다.");
             return;
         }
 
-        const data: LoginResponse = await response.json();
+        const data: SignupResponse = await response.json();
 
-        login(data.accessToken);
-        navigate("/problems");
+        console.log("생성된 userId:", data.userId);
+
+        alert("회원가입이 완료되었습니다.");
+        navigate("/login");
     }
 
     return (
         <div className="auth-page">
             <div className="auth-card">
-                <h1>로그인</h1>
+                <h1>회원가입</h1>
 
                 <div className="auth-form">
                     <div className="auth-field">
@@ -64,8 +69,8 @@ function LoginPage() {
                         />
                     </div>
 
-                    <button className="auth-button" onClick={handleLogin}>
-                        로그인
+                    <button className="auth-button" onClick={handleSignup}>
+                        회원가입
                     </button>
                 </div>
             </div>
@@ -73,4 +78,4 @@ function LoginPage() {
     );
 }
 
-export default LoginPage;
+export default SignupPage;

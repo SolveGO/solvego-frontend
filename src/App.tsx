@@ -1,19 +1,18 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import Layout from "./components/Layout";
-import ProtectedRoute from "./components/ProtectedRoute";
-import ProblemListPage from "./pages/ProblemListPage";
-import ProblemDetailPage from "./pages/ProblemDetailPage";
-import LoginPage from "./pages/LoginPage";
-import SignupPage from "./pages/SignupPage";
-import WrongProblemPage from "./pages/WrongProblemPage";
-import ProblemCreatePage from "./pages/ProblemCreatePage";
-import ProblemEditPage from "./pages/ProblemEditPage";
+import Layout from "./components/Layout/Layout";
+import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute";
+import ProblemListPage from "./pages/problem/ProblemListPage/ProblemListPage";
+import ProblemDetailPage from "./pages/problem/ProblemDetailPage/ProblemDetailPage";
+import LoginPage from "./pages/auth/LoginPage/LoginPage";
+import SignupPage from "./pages/auth/SignupPage/SignupPage";
+import WrongProblemPage from "./pages/problem/WrongProblemPage/WrongProblemPage";
+import ProblemCreatePage from "./pages/problem/ProblemCreatePage/ProblemCreatePage";
+import ProblemEditPage from "./pages/problem/ProblemEditPage/ProblemEditPage";
 
 function App() {
     return (
         <Routes>
             <Route element={<Layout />}>
-                <Route path="/" element={<Navigate to="/problems" replace />} />
                 <Route path="/" element={<Navigate to="/problems" replace />} />
 
                 <Route path="/problems" element={<ProblemListPage />} />
