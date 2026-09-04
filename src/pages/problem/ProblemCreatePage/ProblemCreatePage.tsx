@@ -49,7 +49,6 @@ function ProblemCreatePage() {
             );
 
             if (result === null) {
-                alert("둘 수 없는 위치입니다.");
                 return;
             }
 
