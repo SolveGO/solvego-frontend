@@ -30,7 +30,7 @@ type AttemptResponse = {
 function ProblemDetailPage() {
     const { problemId } = useParams();
     const navigate = useNavigate();
-    const { isLoggedIn, logout } = useContext(AuthContext);
+    const { isLoggedIn } = useContext(AuthContext);
 
     const [problem, setProblem] = useState<ProblemDetail | null>(null);
     const [selectedPosition, setSelectedPosition] = useState<Position | null>(
@@ -62,13 +62,6 @@ function ProblemDetailPage() {
         });
 
         if (!response.ok) {
-            if (response.status === 401) {
-                logout();
-                alert("로그인이 만료되었습니다.");
-                navigate("/login");
-                return;
-            }
-
             if (response.status === 403) {
                 alert("문제를 삭제할 권한이 없습니다.");
                 return;
@@ -106,13 +99,6 @@ function ProblemDetailPage() {
         );
 
         if (!response.ok) {
-            if (response.status === 401) {
-                logout();
-                alert("로그인이 만료되었습니다.");
-                navigate("/login");
-                return;
-            }
-
             alert("풀이 제출에 실패했습니다.");
             return;
         }

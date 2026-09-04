@@ -1,8 +1,11 @@
+import { useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import GoBoard from "../../../components/GoBoard/GoBoard";
 import { authFetch } from "../../../api/api";
-import { useContext, useState } from "react";
 import AuthContext from "../../../contexts/AuthContext";
+import { playMove } from "../../../utils/goRules";
+
 import "../ProblemFormPage.css";
 
 type Position = {
@@ -16,13 +19,16 @@ type NextPlayer = "BLACK" | "WHITE";
 function ProblemCreatePage() {
     const navigate = useNavigate();
     const { logout } = useContext(AuthContext);
+
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [nextPlayer, setNextPlayer] = useState<NextPlayer>("BLACK");
 
     const [blackStones, setBlackStones] = useState<Position[]>([]);
     const [whiteStones, setWhiteStones] = useState<Position[]>([]);
+
     const [boardMode, setBoardMode] = useState<BoardMode>("BLACK");
+
     const [answerPosition, setAnswerPosition] = useState<Position | null>(null);
 
     function isSamePosition(a: Position, b: Position) {
@@ -34,34 +40,49 @@ function ProblemCreatePage() {
     }
 
     function handleBoardSelect(position: Position) {
-        if (boardMode === "BLACK") {
-            const alreadyExists = blackStones.some((stone) =>
-                isSamePosition(stone, position),
+        if (boardMode === "BLACK" || boardMode === "WHITE") {
+            const result = playMove(
+                blackStones,
+                whiteStones,
+                position,
+                boardMode,
             );
 
-            if (alreadyExists) {
+            if (result === null) {
+                alert("둘 수 없는 위치입니다.");
                 return;
             }
 
-            setWhiteStones((prev) => removePosition(prev, position));
-            setBlackStones((prev) => [...prev, position]);
-            setBoardMode("WHITE");
-        } else if (boardMode === "WHITE") {
-            const alreadyExists = whiteStones.some((stone) =>
-                isSamePosition(stone, position),
-            );
+            setBlackStones(result.blackStones);
+            setWhiteStones(result.whiteStones);
 
-            if (alreadyExists) {
+            setBoardMode(boardMode === "BLACK" ? "WHITE" : "BLACK");
+
+            return;
+        }
+
+        if (boardMode === "ERASE") {
+            setBlackStones((prev) => removePosition(prev, position));
+
+            setWhiteStones((prev) => removePosition(prev, position));
+
+            if (answerPosition && isSamePosition(answerPosition, position)) {
+                setAnswerPosition(null);
+            }
+
+            return;
+        }
+
+        if (boardMode === "ANSWER") {
+            const occupied =
+                blackStones.some((stone) => isSamePosition(stone, position)) ||
+                whiteStones.some((stone) => isSamePosition(stone, position));
+
+            if (occupied) {
+                alert("돌이 놓여 있는 위치는 정답으로 선택할 수 없습니다.");
                 return;
             }
 
-            setBlackStones((prev) => removePosition(prev, position));
-            setWhiteStones((prev) => [...prev, position]);
-            setBoardMode("BLACK");
-        } else if (boardMode === "ERASE") {
-            setBlackStones((prev) => removePosition(prev, position));
-            setWhiteStones((prev) => removePosition(prev, position));
-        } else if (boardMode === "ANSWER") {
             setAnswerPosition(position);
         }
     }
@@ -109,6 +130,7 @@ function ProblemCreatePage() {
             <div className="problem-form">
                 <div className="problem-form-field">
                     <label>제목</label>
+
                     <input
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
@@ -117,6 +139,7 @@ function ProblemCreatePage() {
 
                 <div className="problem-form-field">
                     <label>설명</label>
+
                     <textarea
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
@@ -125,6 +148,7 @@ function ProblemCreatePage() {
 
                 <div className="problem-form-field">
                     <label>다음 차례</label>
+
                     <select
                         value={nextPlayer}
                         onChange={(e) =>
@@ -141,10 +165,13 @@ function ProblemCreatePage() {
 
                 <div className="board-mode-buttons">
                     <button onClick={() => setBoardMode("BLACK")}>흑돌</button>
+
                     <button onClick={() => setBoardMode("WHITE")}>백돌</button>
+
                     <button onClick={() => setBoardMode("ERASE")}>
                         지우기
                     </button>
+
                     <button onClick={() => setBoardMode("ANSWER")}>
                         정답 위치
                     </button>
@@ -161,6 +188,7 @@ function ProblemCreatePage() {
 
                 <div className="board-info">
                     <div>흑돌 개수: {blackStones.length}</div>
+
                     <div>백돌 개수: {whiteStones.length}</div>
 
                     {answerPosition && (
