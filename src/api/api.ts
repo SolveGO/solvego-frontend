@@ -7,7 +7,9 @@ export function authFetch(url: string, options: RequestInit = {}) {
         ...options,
         headers: {
             ...options.headers,
-            Authorization: `Bearer ${token}`,
+            ...(token && {
+                Authorization: `Bearer ${token}`,
+            }),
         },
     });
 }

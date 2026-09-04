@@ -22,6 +22,8 @@ function ProblemListPage() {
     const [page, setPage] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
 
+    const groupSize = 5;
+
     useEffect(() => {
         async function fetchProblems() {
             const response = await fetch(
@@ -37,42 +39,35 @@ function ProblemListPage() {
         fetchProblems();
     }, [page]);
 
-    function getPageNumbers(
-        currentPage: number,
-        totalPages: number,
-    ): (number | "...")[] {
-        if (totalPages <= 9) {
-            return Array.from({ length: totalPages }, (_, i) => i);
-        }
+    function getPageNumbers(currentPage: number, totalPages: number): number[] {
+        const currentGroup = Math.floor(currentPage / groupSize);
 
-        const pages: (number | "...")[] = [];
+        const start = currentGroup * groupSize;
+        const end = Math.min(start + groupSize, totalPages);
 
-        // 첫 페이지
-        pages.push(0);
-
-        const start = Math.max(1, currentPage - 3);
-        const end = Math.min(totalPages - 2, currentPage + 3);
-
-        // 앞쪽 생략
-        if (start > 1) {
-            pages.push("...");
-        }
-
-        // 현재 페이지 주변
-        for (let i = start; i <= end; i++) {
-            pages.push(i);
-        }
-
-        // 뒤쪽 생략
-        if (end < totalPages - 2) {
-            pages.push("...");
-        }
-
-        // 마지막 페이지
-        pages.push(totalPages - 1);
-
-        return pages;
+        return Array.from({ length: end - start }, (_, i) => start + i);
     }
+
+    const currentGroup = Math.floor(page / groupSize);
+    const groupStart = currentGroup * groupSize;
+    const groupEnd = Math.min(groupStart + groupSize - 1, totalPages - 1);
+
+    function handlePreviousGroup() {
+        if (groupStart === 0) {
+            return;
+        }
+
+        setPage(groupStart - groupSize);
+    }
+
+    function handleNextGroup() {
+        if (groupEnd >= totalPages - 1) {
+            return;
+        }
+
+        setPage(groupStart + groupSize);
+    }
+
     return (
         <div className="problem-list-page">
             <h1>문제 목록</h1>
@@ -88,28 +83,50 @@ function ProblemListPage() {
                 ))}
             </div>
 
-            <div className="pagination">
-                {getPageNumbers(page, totalPages).map((item, index) =>
-                    item === "..." ? (
-                        <span
-                            key={`ellipsis-${index}`}
-                            className="page-ellipsis">
-                            ...
-                        </span>
-                    ) : (
+            {totalPages > 0 && (
+                <div className="pagination">
+                    <button
+                        className="page-button"
+                        onClick={() => setPage(0)}
+                        disabled={page === 0}>
+                        처음
+                    </button>
+
+                    <button
+                        className="page-button"
+                        onClick={handlePreviousGroup}
+                        disabled={groupStart === 0}>
+                        이전
+                    </button>
+
+                    {getPageNumbers(page, totalPages).map((pageNumber) => (
                         <button
-                            key={item}
+                            key={pageNumber}
                             className={
-                                page === item
+                                page === pageNumber
                                     ? "page-button active"
                                     : "page-button"
                             }
-                            onClick={() => setPage(item)}>
-                            {item + 1}
+                            onClick={() => setPage(pageNumber)}>
+                            {pageNumber + 1}
                         </button>
-                    ),
-                )}
-            </div>
+                    ))}
+
+                    <button
+                        className="page-button"
+                        onClick={handleNextGroup}
+                        disabled={groupEnd === totalPages - 1}>
+                        다음
+                    </button>
+
+                    <button
+                        className="page-button"
+                        onClick={() => setPage(totalPages - 1)}
+                        disabled={page === totalPages - 1}>
+                        끝
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

@@ -19,10 +19,10 @@ function Layout() {
     return (
         <div className="layout">
             <aside className="sidebar">
-                <div className="logo">
+                <NavLink to="/problems" className="logo">
                     <img src="/solvego.png" alt="SolveGO logo" />
                     <span>SolveGO</span>
-                </div>
+                </NavLink>
 
                 <nav className="sidebar-nav">
                     <NavLink to="/problems" end className={navClassName}>

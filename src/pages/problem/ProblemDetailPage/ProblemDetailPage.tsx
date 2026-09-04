@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import GoBoard from "../../../components/GoBoard/GoBoard";
 import AuthContext from "../../../contexts/AuthContext";
-import { API_BASE_URL, authFetch } from "../../../api/api";
+import { authFetch } from "../../../api/api";
 
 import "./ProblemDetailPage.css";
 
@@ -20,6 +20,7 @@ type ProblemDetail = {
     whiteStones: Position[];
     nextPlayer: "BLACK" | "WHITE";
     creatorName: string;
+    owner: boolean;
 };
 
 type AttemptResponse = {
@@ -39,9 +40,7 @@ function ProblemDetailPage() {
 
     useEffect(() => {
         async function fetchProblem() {
-            const response = await fetch(
-                `${API_BASE_URL}/api/problems/${problemId}`,
-            );
+            const response = await authFetch(`/api/problems/${problemId}`);
 
             const data: ProblemDetail = await response.json();
 
@@ -168,16 +167,20 @@ function ProblemDetailPage() {
                         </p>
                     )}
 
-                    <div className="manage-actions">
-                        <button
-                            onClick={() =>
-                                navigate(`/problems/${problemId}/edit`)
-                            }>
-                            문제 수정
-                        </button>
+                    {problem.owner && (
+                        <div className="manage-actions">
+                            <button
+                                onClick={() =>
+                                    navigate(`/problems/${problemId}/edit`)
+                                }>
+                                문제 수정
+                            </button>
 
-                        <button onClick={handleDeleteProblem}>문제 삭제</button>
-                    </div>
+                            <button onClick={handleDeleteProblem}>
+                                문제 삭제
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
