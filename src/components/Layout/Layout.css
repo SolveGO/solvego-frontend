@@ -5,7 +5,11 @@
 
 .sidebar {
     width: 240px;
+    min-height: 100vh;
     padding: 32px 24px;
+
+    display: flex;
+    flex-direction: column;
 
     border-right: 1px solid var(--alabaster-grey);
 
@@ -16,16 +20,21 @@
     display: flex;
     align-items: center;
     gap: 10px;
+
     margin: 0 0 40px;
+
     font-size: 24px;
     font-weight: bold;
+
     color: var(--prussian-blue);
+
     text-decoration: none;
 }
 
 .logo img {
     width: 32px;
     height: 32px;
+
     object-fit: contain;
 }
 
@@ -35,13 +44,14 @@
     gap: 8px;
 }
 
-.sidebar-nav a,
-.sidebar-nav button {
-    padding: 12px 0;
+.sidebar-nav a {
+    padding: 12px 10px;
 
     color: var(--dusk-blue);
 
-    font: inherit;
+    font-size: 18px;
+    font-weight: 500;
+
     text-align: left;
     text-decoration: none;
 
@@ -52,20 +62,69 @@
     cursor: pointer;
 }
 
-.sidebar-nav a:hover,
-.sidebar-nav button:hover {
+.sidebar-nav a:hover {
     color: var(--prussian-blue);
+
     background: rgba(119, 141, 169, 0.08);
 }
 
 /* 현재 페이지 */
+
 .sidebar-nav a.active {
     color: var(--prussian-blue);
+
+    background: rgba(119, 141, 169, 0.08);
+
+    font-weight: 700;
+}
+
+/* 로그인 / 로그아웃 영역 */
+
+.sidebar-account {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    margin-top: auto;
+}
+
+.sidebar-account a,
+.sidebar-account button {
+    padding: 12px 10px;
+
+    color: var(--dusk-blue);
+
+    font-size: 18px;
+    font-weight: 500;
+    font-family: inherit;
+
+    text-align: left;
+    text-decoration: none;
+
     background: none;
+    border: none;
+    border-radius: 8px;
+
+    cursor: pointer;
+}
+
+.sidebar-account a:hover,
+.sidebar-account button:hover {
+    color: var(--prussian-blue);
+
+    background: rgba(119, 141, 169, 0.08);
+}
+
+.sidebar-account a.active {
+    color: var(--prussian-blue);
+
+    background: rgba(119, 141, 169, 0.08);
+
     font-weight: 700;
 }
 
 .content {
     flex: 1;
+
     padding: 48px;
 }

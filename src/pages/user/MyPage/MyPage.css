@@ -1,0 +1,279 @@
+.mypage {
+    width: 760px;
+}
+
+.mypage h1 {
+    margin: 0 0 32px;
+
+    font-size: 32px;
+
+    color: var(--ink-black);
+}
+
+/* 운영 전 안내 */
+
+.mypage-notice {
+    margin-bottom: 40px;
+    padding: 18px 20px;
+
+    border: 1px solid var(--alabaster-grey);
+    border-radius: 10px;
+
+    background: #f7f8fa;
+}
+
+.mypage-notice strong {
+    display: block;
+
+    margin-bottom: 6px;
+
+    font-size: 15px;
+
+    color: var(--ink-black);
+}
+
+.mypage-notice p {
+    margin: 0;
+
+    font-size: 14px;
+
+    color: var(--dusk-blue);
+}
+
+/* 공통 섹션 */
+
+.mypage-section {
+    margin-bottom: 44px;
+}
+
+.mypage-section h2 {
+    margin: 0 0 18px;
+
+    font-size: 20px;
+
+    color: var(--ink-black);
+}
+
+/* 내 정보 */
+
+.mypage-info {
+    overflow: hidden;
+
+    border: 1px solid var(--alabaster-grey);
+    border-radius: 10px;
+
+    background: var(--white);
+}
+
+.mypage-info-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    padding: 16px 18px;
+
+    border-bottom: 1px solid var(--alabaster-grey);
+}
+
+.mypage-info-row:last-child {
+    border-bottom: none;
+}
+
+.mypage-info-row span {
+    font-size: 14px;
+
+    color: var(--dusk-blue);
+}
+
+.mypage-info-row strong {
+    font-size: 15px;
+    font-weight: 600;
+
+    color: var(--ink-black);
+}
+
+/* 내 활동 */
+
+.mypage-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.mypage-stat-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    padding: 20px;
+
+    border: 1px solid var(--alabaster-grey);
+    border-radius: 10px;
+
+    background: var(--white);
+}
+
+.mypage-stat-card span {
+    font-size: 14px;
+
+    color: var(--dusk-blue);
+}
+
+.mypage-stat-card strong {
+    font-size: 28px;
+    font-weight: 700;
+
+    color: var(--prussian-blue);
+}
+
+/* 내가 등록한 문제 */
+
+.mypage-problem-list {
+    overflow: hidden;
+
+    border: 1px solid var(--alabaster-grey);
+    border-radius: 10px;
+
+    background: var(--white);
+}
+
+.mypage-problem-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    padding: 16px 18px;
+
+    color: var(--ink-black);
+
+    text-decoration: none;
+
+    border-bottom: 1px solid var(--alabaster-grey);
+}
+
+.mypage-problem-item:last-child {
+    border-bottom: none;
+}
+
+.mypage-problem-item:hover {
+    background: #f7f8fa;
+}
+
+.mypage-empty {
+    margin: 0;
+
+    padding: 20px;
+
+    border: 1px solid var(--alabaster-grey);
+    border-radius: 10px;
+
+    font-size: 14px;
+
+    color: var(--lavender-grey);
+
+    background: var(--white);
+}
+
+/* 비밀번호 변경 */
+
+.mypage-password-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    padding: 22px;
+
+    border: 1px solid var(--alabaster-grey);
+    border-radius: 10px;
+
+    background: var(--white);
+}
+
+.mypage-password-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    font-size: 14px;
+    font-weight: 500;
+
+    color: var(--dusk-blue);
+}
+
+.mypage-password-form input {
+    width: 100%;
+
+    padding: 11px 12px;
+
+    box-sizing: border-box;
+
+    border: 1px solid var(--alabaster-grey);
+    border-radius: 8px;
+
+    font: inherit;
+
+    color: var(--ink-black);
+
+    background: var(--white);
+}
+
+.mypage-password-form input:focus {
+    outline: none;
+
+    border-color: var(--prussian-blue);
+}
+
+.mypage-password-form button {
+    width: fit-content;
+
+    margin-top: 4px;
+    padding: 9px 16px;
+
+    border: 1px solid var(--prussian-blue);
+    border-radius: 8px;
+
+    font: inherit;
+    font-weight: 600;
+
+    color: var(--white);
+    background: var(--prussian-blue);
+
+    cursor: pointer;
+}
+
+.mypage-password-form button:hover {
+    opacity: 0.9;
+}
+
+/* 회원 탈퇴 */
+
+.mypage-danger {
+    padding-top: 8px;
+}
+
+.mypage-danger p {
+    margin: 0 0 16px;
+
+    font-size: 14px;
+
+    color: var(--dusk-blue);
+}
+
+.mypage-danger button {
+    padding: 9px 16px;
+
+    border: 1px solid #dc2626;
+    border-radius: 8px;
+
+    font: inherit;
+    font-weight: 600;
+
+    color: #dc2626;
+    background: var(--white);
+
+    cursor: pointer;
+}
+
+.mypage-danger button:hover {
+    background: #fef2f2;
+}

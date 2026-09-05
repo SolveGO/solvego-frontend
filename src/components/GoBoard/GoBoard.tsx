@@ -8,7 +8,10 @@ type Position = {
 type GoBoardProps = {
     blackStones: Position[];
     whiteStones: Position[];
+
     selectedPosition?: Position | null;
+    lastMovePosition?: Position | null;
+    aiRecommendedPosition?: Position | null;
 
     // 문제 풀이 화면에서만 전달
     selectedStone?: "BLACK" | "WHITE";
@@ -35,6 +38,14 @@ function GoBoard(props: GoBoardProps) {
                         props.selectedPosition?.x === x &&
                         props.selectedPosition?.y === y;
 
+                    const isLastMove =
+                        props.lastMovePosition?.x === x &&
+                        props.lastMovePosition?.y === y;
+
+                    const isAiRecommended =
+                        props.aiRecommendedPosition?.x === x &&
+                        props.aiRecommendedPosition?.y === y;
+
                     const isStarPoint =
                         [3, 9, 15].includes(x) && [3, 9, 15].includes(y);
 
@@ -59,18 +70,28 @@ function GoBoard(props: GoBoardProps) {
                                 <span className="stone white-stone" />
                             )}
 
+                            {isLastMove && (hasBlackStone || hasWhiteStone) && (
+                                <span className="last-move-marker" />
+                            )}
+
                             {isSelected &&
                                 !hasBlackStone &&
                                 !hasWhiteStone &&
                                 props.selectedStone === "BLACK" && (
-                                    <span className="stone black-stone" />
+                                    <>
+                                        <span className="stone black-stone" />
+                                        <span className="last-move-marker" />
+                                    </>
                                 )}
 
                             {isSelected &&
                                 !hasBlackStone &&
                                 !hasWhiteStone &&
                                 props.selectedStone === "WHITE" && (
-                                    <span className="stone white-stone" />
+                                    <>
+                                        <span className="stone white-stone" />
+                                        <span className="last-move-marker" />
+                                    </>
                                 )}
 
                             {isSelected &&
@@ -78,6 +99,12 @@ function GoBoard(props: GoBoardProps) {
                                 !hasWhiteStone &&
                                 !props.selectedStone && (
                                     <span className="selected-marker" />
+                                )}
+
+                            {isAiRecommended &&
+                                !hasBlackStone &&
+                                !hasWhiteStone && (
+                                    <span className="ai-recommended-marker" />
                                 )}
                         </button>
                     );

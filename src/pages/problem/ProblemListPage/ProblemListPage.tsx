@@ -27,7 +27,7 @@ function ProblemListPage() {
     useEffect(() => {
         async function fetchProblems() {
             const response = await fetch(
-                `${API_BASE_URL}/api/problems?page=${page}&size=10`,
+                `${API_BASE_URL}/api/problems?page=${page}&size=7`,
             );
 
             const data: ProblemPageResponse = await response.json();

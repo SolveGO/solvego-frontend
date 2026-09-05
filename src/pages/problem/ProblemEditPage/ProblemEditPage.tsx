@@ -1,17 +1,20 @@
 import { useContext, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+
 import GoBoard from "../../../components/GoBoard/GoBoard";
 import { authFetch } from "../../../api/api";
 import AuthContext from "../../../contexts/AuthContext";
-import "../ProblemFormPage.css";
+import { playMove } from "../../../utils/goRules";
+
+import "./ProblemEditPage.css";
 
 type Position = {
     x: number;
     y: number;
 };
 
-type BoardMode = "BLACK" | "WHITE" | "ERASE" | "ANSWER";
-type NextPlayer = "BLACK" | "WHITE";
+type StoneColor = "BLACK" | "WHITE";
+type BoardMode = "PLAY" | "ANSWER";
 
 type ProblemEditResponse = {
     problemId: number;
@@ -19,8 +22,20 @@ type ProblemEditResponse = {
     description: string;
     blackStones: Position[];
     whiteStones: Position[];
-    nextPlayer: NextPlayer;
+    nextPlayer: StoneColor;
     answerPosition: Position;
+};
+
+type BoardHistory = {
+    blackStones: Position[];
+    whiteStones: Position[];
+    nextStone: StoneColor;
+    lastPlacedPosition: Position | null;
+};
+
+type AiRecommendResponse = {
+    bestMove: Position;
+    bestWinRate: number;
 };
 
 function ProblemEditPage() {
@@ -30,12 +45,25 @@ function ProblemEditPage() {
 
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
-    const [nextPlayer, setNextPlayer] = useState<NextPlayer>("BLACK");
 
     const [blackStones, setBlackStones] = useState<Position[]>([]);
     const [whiteStones, setWhiteStones] = useState<Position[]>([]);
-    const [boardMode, setBoardMode] = useState<BoardMode>("BLACK");
+
+    const [nextStone, setNextStone] = useState<StoneColor>("BLACK");
+
+    const [boardMode, setBoardMode] = useState<BoardMode>("PLAY");
+
     const [answerPosition, setAnswerPosition] = useState<Position | null>(null);
+
+    const [lastPlacedPosition, setLastPlacedPosition] =
+        useState<Position | null>(null);
+
+    const [history, setHistory] = useState<BoardHistory[]>([]);
+
+    const [aiRecommendation, setAiRecommendation] =
+        useState<AiRecommendResponse | null>(null);
+
+    const [isAiLoading, setIsAiLoading] = useState(false);
 
     useEffect(() => {
         async function fetchProblemForEdit() {
@@ -69,57 +97,135 @@ function ProblemEditPage() {
 
             setTitle(data.title);
             setDescription(data.description);
-            setNextPlayer(data.nextPlayer);
+
             setBlackStones(data.blackStones);
             setWhiteStones(data.whiteStones);
+
+            setNextStone(data.nextPlayer);
+
             setAnswerPosition(data.answerPosition);
+
+            setLastPlacedPosition(null);
+            setHistory([]);
+            setAiRecommendation(null);
         }
 
         fetchProblemForEdit();
-    }, [problemId, navigate]);
+    }, [problemId, navigate, logout]);
 
     function isSamePosition(a: Position, b: Position) {
         return a.x === b.x && a.y === b.y;
     }
 
-    function removePosition(stones: Position[], position: Position) {
-        return stones.filter((stone) => !isSamePosition(stone, position));
+    function handleBoardSelect(position: Position) {
+        if (boardMode === "ANSWER") {
+            const occupied =
+                blackStones.some((stone) => isSamePosition(stone, position)) ||
+                whiteStones.some((stone) => isSamePosition(stone, position));
+
+            if (occupied) {
+                alert("돌이 놓여 있는 위치는 정답으로 선택할 수 없습니다.");
+                return;
+            }
+
+            setAnswerPosition(position);
+            return;
+        }
+
+        const result = playMove(blackStones, whiteStones, position, nextStone);
+
+        if (result === null) {
+            return;
+        }
+
+        setHistory((prev) => [
+            ...prev,
+            {
+                blackStones,
+                whiteStones,
+                nextStone,
+                lastPlacedPosition,
+            },
+        ]);
+
+        setBlackStones(result.blackStones);
+        setWhiteStones(result.whiteStones);
+
+        setLastPlacedPosition(position);
+
+        setNextStone(nextStone === "BLACK" ? "WHITE" : "BLACK");
+
+        setAiRecommendation(null);
     }
 
-    function handleBoardSelect(position: Position) {
-        if (boardMode === "BLACK") {
-            const alreadyExists = blackStones.some((stone) =>
-                isSamePosition(stone, position),
-            );
+    function handleUndo() {
+        if (history.length === 0) {
+            return;
+        }
 
-            if (alreadyExists) {
+        const previousState = history[history.length - 1];
+
+        setBlackStones(previousState.blackStones);
+        setWhiteStones(previousState.whiteStones);
+
+        setNextStone(previousState.nextStone);
+
+        setLastPlacedPosition(previousState.lastPlacedPosition);
+
+        setHistory((prev) => prev.slice(0, -1));
+
+        setAiRecommendation(null);
+    }
+
+    function handleAnswerMode() {
+        setBoardMode((prev) => (prev === "ANSWER" ? "PLAY" : "ANSWER"));
+    }
+
+    async function handleAiRecommend() {
+        setIsAiLoading(true);
+
+        try {
+            const response = await authFetch("/api/ai/recommend", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    blackStones,
+                    whiteStones,
+                    nextPlayer: nextStone,
+                }),
+            });
+
+            if (!response.ok) {
+                if (response.status === 502) {
+                    alert("AI 서버에 연결할 수 없습니다.");
+                    return;
+                }
+
+                if (response.status === 504) {
+                    alert("AI 분석 시간이 초과되었습니다.");
+                    return;
+                }
+
+                alert("AI 추천에 실패했습니다.");
                 return;
             }
 
-            setWhiteStones((prev) => removePosition(prev, position));
-            setBlackStones((prev) => [...prev, position]);
-            setBoardMode("WHITE");
-        } else if (boardMode === "WHITE") {
-            const alreadyExists = whiteStones.some((stone) =>
-                isSamePosition(stone, position),
-            );
+            const data: AiRecommendResponse = await response.json();
 
-            if (alreadyExists) {
-                return;
-            }
-
-            setBlackStones((prev) => removePosition(prev, position));
-            setWhiteStones((prev) => [...prev, position]);
-            setBoardMode("BLACK");
-        } else if (boardMode === "ERASE") {
-            setBlackStones((prev) => removePosition(prev, position));
-            setWhiteStones((prev) => removePosition(prev, position));
-        } else if (boardMode === "ANSWER") {
-            setAnswerPosition(position);
+            setAiRecommendation(data);
+        } finally {
+            setIsAiLoading(false);
         }
     }
 
     async function handleUpdateProblem() {
+        if (title.trim() === "") {
+            alert("제목을 입력해주세요.");
+            return;
+        }
+
         if (answerPosition === null) {
             alert("정답 위치를 선택해주세요.");
             return;
@@ -135,7 +241,7 @@ function ProblemEditPage() {
                 description,
                 blackStones,
                 whiteStones,
-                nextPlayer,
+                nextPlayer: nextStone,
                 answerPosition,
             }),
         });
@@ -143,8 +249,11 @@ function ProblemEditPage() {
         if (!response.ok) {
             if (response.status === 401) {
                 logout();
+
                 alert("로그인이 만료되었습니다.");
+
                 navigate("/login");
+
                 return;
             }
 
@@ -155,11 +264,14 @@ function ProblemEditPage() {
 
             if (response.status === 404) {
                 alert("존재하지 않는 문제입니다.");
+
                 navigate("/problems");
+
                 return;
             }
 
             alert("문제 수정에 실패했습니다.");
+
             return;
         }
 
@@ -167,82 +279,126 @@ function ProblemEditPage() {
     }
 
     return (
-        <div className="problem-form-page">
-            <h1>문제 수정</h1>
+        <div className="problem-edit-page">
+            <div className="problem-edit-content">
+                <h1>문제 수정</h1>
 
-            <div className="problem-form">
-                <div className="problem-form-field">
-                    <label>제목</label>
-                    <input
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                    />
-                </div>
+                <div className="problem-edit-board-section">
+                    <div className="problem-edit-main">
+                        <div className="problem-edit-board-area">
+                            <GoBoard
+                                blackStones={blackStones}
+                                whiteStones={whiteStones}
+                                selectedPosition={answerPosition}
+                                lastMovePosition={lastPlacedPosition}
+                                aiRecommendedPosition={
+                                    aiRecommendation?.bestMove
+                                }
+                                onSelect={handleBoardSelect}
+                            />
 
-                <div className="problem-form-field">
-                    <label>설명</label>
-                    <textarea
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                    />
-                </div>
+                            <div className="board-mode-buttons">
+                                <button
+                                    onClick={handleUndo}
+                                    disabled={history.length === 0}>
+                                    한 수 뒤로
+                                </button>
 
-                <div className="problem-form-field">
-                    <label>다음 차례</label>
-                    <select
-                        value={nextPlayer}
-                        onChange={(e) =>
-                            setNextPlayer(e.target.value as NextPlayer)
-                        }>
-                        <option value="BLACK">흑</option>
-                        <option value="WHITE">백</option>
-                    </select>
-                </div>
-            </div>
+                                <button
+                                    className={
+                                        boardMode === "ANSWER" ? "active" : ""
+                                    }
+                                    onClick={handleAnswerMode}>
+                                    정답 위치
+                                </button>
 
-            <div className="board-editor">
-                <h2>바둑판 설정</h2>
+                                <button
+                                    className="ai-recommend-button"
+                                    onClick={handleAiRecommend}
+                                    disabled={isAiLoading}>
+                                    {isAiLoading
+                                        ? "AI 추천 중..."
+                                        : "AI 추천 수 보기"}
+                                </button>
+                            </div>
 
-                <div className="board-mode-buttons">
-                    <button onClick={() => setBoardMode("BLACK")}>흑돌</button>
-
-                    <button onClick={() => setBoardMode("WHITE")}>백돌</button>
-
-                    <button onClick={() => setBoardMode("ERASE")}>
-                        지우기
-                    </button>
-
-                    <button onClick={() => setBoardMode("ANSWER")}>
-                        정답 위치
-                    </button>
-                </div>
-
-                <p className="board-status">현재 모드: {boardMode}</p>
-
-                <GoBoard
-                    blackStones={blackStones}
-                    whiteStones={whiteStones}
-                    selectedPosition={answerPosition}
-                    onSelect={handleBoardSelect}
-                />
-
-                <div className="board-info">
-                    <div>흑돌 개수: {blackStones.length}</div>
-                    <div>백돌 개수: {whiteStones.length}</div>
-
-                    {answerPosition && (
-                        <div>
-                            정답 위치: ({answerPosition.x}, {answerPosition.y})
+                            <p className="ai-recommend-disclaimer">
+                                AI 추천은 참고용이며 정답은 작성자가 직접
+                                지정합니다.
+                            </p>
                         </div>
-                    )}
+
+                        <div className="problem-edit-form">
+                            <div className="problem-edit-field">
+                                <label htmlFor="problem-title">제목</label>
+
+                                <input
+                                    id="problem-title"
+                                    type="text"
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
+                                    placeholder="문제 제목을 입력하세요."
+                                />
+                            </div>
+
+                            <div className="problem-edit-field">
+                                <label htmlFor="problem-description">
+                                    설명
+                                </label>
+
+                                <textarea
+                                    id="problem-description"
+                                    value={description}
+                                    onChange={(e) =>
+                                        setDescription(e.target.value)
+                                    }
+                                    placeholder="문제에 대한 설명을 입력하세요."
+                                />
+                            </div>
+
+                            <button
+                                className="problem-edit-submit"
+                                onClick={handleUpdateProblem}>
+                                수정 완료
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="problem-edit-side-panel">
+                        {aiRecommendation && (
+                            <div className="ai-recommendation">
+                                <h2>AI 추천</h2>
+
+                                <div className="ai-recommend-row">
+                                    <div className="ai-recommend-label-row">
+                                        <span>추천 승률</span>
+
+                                        <strong>
+                                            {(
+                                                aiRecommendation.bestWinRate *
+                                                100
+                                            ).toFixed(1)}
+                                            %
+                                        </strong>
+                                    </div>
+
+                                    <div className="ai-recommend-winrate-bar">
+                                        <div
+                                            className="ai-recommend-winrate-fill"
+                                            style={{
+                                                width: `${
+                                                    aiRecommendation.bestWinRate *
+                                                    100
+                                                }%`,
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
-
-            <button
-                className="problem-form-submit"
-                onClick={handleUpdateProblem}>
-                수정 완료
-            </button>
         </div>
     );
 }
