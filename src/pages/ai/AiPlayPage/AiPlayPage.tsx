@@ -13,9 +13,15 @@ type Position = {
 
 type StoneColor = "BLACK" | "WHITE";
 
-type AiRecommendResponse = {
-    bestMove: Position;
-    bestWinRate: number;
+type GameMove = {
+    player: StoneColor;
+    position: Position | null;
+};
+
+type AiGameNextMoveResponse = {
+    move: Position | null;
+    winRate: number;
+    scoreLead: number;
 };
 
 type WinRatePoint = {
@@ -89,7 +95,6 @@ function WinRateChart({ history }: { history: WinRatePoint[] }) {
 
 function AiPlayPage() {
     const [blackStones, setBlackStones] = useState<Position[]>([]);
-
     const [whiteStones, setWhiteStones] = useState<Position[]>([]);
 
     const [lastMovePosition, setLastMovePosition] = useState<Position | null>(
@@ -103,6 +108,12 @@ function AiPlayPage() {
     const [blackWinRate, setBlackWinRate] = useState<number | null>(null);
 
     const [winRateHistory, setWinRateHistory] = useState<WinRatePoint[]>([]);
+
+    const [moves, setMoves] = useState<GameMove[]>([]);
+
+    const [consecutivePasses, setConsecutivePasses] = useState(0);
+
+    const [isGameOver, setIsGameOver] = useState(false);
 
     function getAiColor(currentPlayerColor: StoneColor): StoneColor {
         return currentPlayerColor === "BLACK" ? "WHITE" : "BLACK";
@@ -124,25 +135,31 @@ function AiPlayPage() {
 
         setBlackWinRate(null);
         setWinRateHistory([]);
+
+        setMoves([]);
+
+        setConsecutivePasses(0);
+
+        setIsGameOver(false);
     }
 
     async function requestAiMove(
         currentBlackStones: Position[],
         currentWhiteStones: Position[],
+        currentMoves: GameMove[],
         aiColor: StoneColor,
+        currentConsecutivePasses: number,
     ) {
         setIsAiThinking(true);
 
         try {
-            const response = await authFetch("/api/ai/recommend", {
+            const response = await authFetch("/api/ai/game/next-move", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    blackStones: currentBlackStones,
-                    whiteStones: currentWhiteStones,
-                    nextPlayer: aiColor,
+                    moves: currentMoves,
                 }),
             });
 
@@ -158,16 +175,60 @@ function AiPlayPage() {
                 }
 
                 alert("AI의 수를 가져오지 못했습니다.");
+                return;
+            }
+
+            const data: AiGameNextMoveResponse = await response.json();
+
+            const currentBlackWinRate = convertToBlackWinRate(
+                data.winRate,
+                aiColor,
+            );
+
+            /*
+             * AI PASS
+             */
+            if (data.move === null) {
+                const nextMoves: GameMove[] = [
+                    ...currentMoves,
+                    {
+                        player: aiColor,
+                        position: null,
+                    },
+                ];
+
+                const nextConsecutivePasses = currentConsecutivePasses + 1;
+
+                setMoves(nextMoves);
+
+                setLastMovePosition(null);
+
+                setConsecutivePasses(nextConsecutivePasses);
+
+                setBlackWinRate(currentBlackWinRate);
+
+                setWinRateHistory((prev) => [
+                    ...prev,
+                    {
+                        turn: prev.length + 1,
+                        blackWinRate: currentBlackWinRate,
+                    },
+                ]);
+
+                if (nextConsecutivePasses >= 2) {
+                    setIsGameOver(true);
+                }
 
                 return;
             }
 
-            const data: AiRecommendResponse = await response.json();
-
+            /*
+             * AI 착수
+             */
             const aiMoveResult = playMove(
                 currentBlackStones,
                 currentWhiteStones,
-                data.bestMove,
+                data.move,
                 aiColor,
             );
 
@@ -176,16 +237,26 @@ function AiPlayPage() {
                 return;
             }
 
+            const nextMoves: GameMove[] = [
+                ...currentMoves,
+                {
+                    player: aiColor,
+                    position: data.move,
+                },
+            ];
+
             setBlackStones(aiMoveResult.blackStones);
 
             setWhiteStones(aiMoveResult.whiteStones);
 
-            setLastMovePosition(data.bestMove);
+            setLastMovePosition(data.move);
 
-            const currentBlackWinRate = convertToBlackWinRate(
-                data.bestWinRate,
-                aiColor,
-            );
+            setMoves(nextMoves);
+
+            /*
+             * 실제 착수가 발생하면 연속 PASS는 끊긴다.
+             */
+            setConsecutivePasses(0);
 
             setBlackWinRate(currentBlackWinRate);
 
@@ -202,7 +273,7 @@ function AiPlayPage() {
     }
 
     async function handleBoardSelect(position: Position) {
-        if (isAiThinking) {
+        if (isAiThinking || isGameOver) {
             return;
         }
 
@@ -218,8 +289,15 @@ function AiPlayPage() {
         }
 
         const nextBlackStones = userMoveResult.blackStones;
-
         const nextWhiteStones = userMoveResult.whiteStones;
+
+        const nextMoves: GameMove[] = [
+            ...moves,
+            {
+                player: playerColor,
+                position,
+            },
+        ];
 
         setBlackStones(nextBlackStones);
 
@@ -227,18 +305,69 @@ function AiPlayPage() {
 
         setLastMovePosition(position);
 
+        setMoves(nextMoves);
+
+        /*
+         * 사용자가 실제로 착수했으므로
+         * 이전 PASS 기록은 끊긴다.
+         */
+        setConsecutivePasses(0);
+
         const aiColor = getAiColor(playerColor);
 
-        await requestAiMove(nextBlackStones, nextWhiteStones, aiColor);
+        await requestAiMove(
+            nextBlackStones,
+            nextWhiteStones,
+            nextMoves,
+            aiColor,
+            0,
+        );
+    }
+
+    async function handlePass() {
+        if (isAiThinking || isGameOver) {
+            return;
+        }
+
+        const nextMoves: GameMove[] = [
+            ...moves,
+            {
+                player: playerColor,
+                position: null,
+            },
+        ];
+
+        const nextConsecutivePasses = consecutivePasses + 1;
+
+        setMoves(nextMoves);
+
+        setLastMovePosition(null);
+
+        setConsecutivePasses(nextConsecutivePasses);
+
+        /*
+         * 직전에 AI가 PASS했다면
+         * 사용자 PASS로 2연속 PASS가 되어 대국 종료.
+         */
+        if (nextConsecutivePasses >= 2) {
+            setIsGameOver(true);
+            return;
+        }
+
+        const aiColor = getAiColor(playerColor);
+
+        await requestAiMove(
+            blackStones,
+            whiteStones,
+            nextMoves,
+            aiColor,
+            nextConsecutivePasses,
+        );
     }
 
     async function handleStartGame(color: StoneColor) {
         /*
-         * AI 응답을 기다리는 동안 다른 대국을 시작하면
-         * 이전 요청의 응답이 새 판에 적용될 수 있으므로
-         * 클릭 동작만 무시한다.
-         *
-         * 버튼의 시각적 스타일은 변경하지 않는다.
+         * AI 응답 대기 중에는 새 대국 시작을 막는다.
          */
         if (isAiThinking) {
             return;
@@ -248,13 +377,17 @@ function AiPlayPage() {
 
         resetBoard();
 
-        // 내가 흑이면 빈 판에서 바로 시작
+        /*
+         * 내가 흑이면 내가 첫 수를 둔다.
+         */
         if (color === "BLACK") {
             return;
         }
 
-        // 내가 백이면 AI가 흑으로 첫 수
-        await requestAiMove([], [], "BLACK");
+        /*
+         * 내가 백이면 AI가 흑으로 첫 수를 둔다.
+         */
+        await requestAiMove([], [], [], "BLACK", 0);
     }
 
     return (
@@ -263,6 +396,13 @@ function AiPlayPage() {
                 <h1>AI 대국</h1>
 
                 <div className="ai-play-start-buttons">
+                    <button
+                        className="ai-play-pass-button"
+                        onClick={handlePass}
+                        disabled={isAiThinking || isGameOver}>
+                        PASS
+                    </button>
+
                     <button
                         className={
                             playerColor === "BLACK" ? "black-active" : ""
@@ -284,7 +424,7 @@ function AiPlayPage() {
             <div className="ai-play-content">
                 <div
                     className={
-                        isAiThinking
+                        isAiThinking || isGameOver
                             ? "ai-play-board-area disabled"
                             : "ai-play-board-area"
                     }>
@@ -299,8 +439,17 @@ function AiPlayPage() {
                 <div className="position-panel">
                     <h2>형세</h2>
 
-                    {blackWinRate === null ? (
-                        <p className="position-empty">첫 수를 두어주세요.</p>
+                    {isGameOver ? (
+                        <div className="game-over-message">
+                            <strong>대국 종료</strong>
+                            <p>흑과 백이 연속으로 PASS했습니다.</p>
+                        </div>
+                    ) : blackWinRate === null ? (
+                        <p className="position-empty">
+                            {isAiThinking
+                                ? "AI가 생각하고 있습니다."
+                                : "첫 수를 두어주세요."}
+                        </p>
                     ) : (
                         <>
                             <div className="position-rate-row">

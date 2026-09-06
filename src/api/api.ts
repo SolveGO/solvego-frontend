@@ -27,3 +27,7 @@ export async function authFetch(url: string, options: RequestInit = {}) {
 
     return response;
 }
+
+export async function publicFetch(url: string, options: RequestInit = {}) {
+    return fetch(`${API_BASE_URL}${url}`, options);
+}

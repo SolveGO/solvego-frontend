@@ -20,7 +20,7 @@
     color: var(--ink-black);
 }
 
-/* 흑 / 백으로 새 대국 시작 */
+/* PASS / 흑 / 백으로 새 대국 시작 */
 
 .ai-play-start-buttons {
     display: flex;
@@ -41,10 +41,16 @@
     cursor: pointer;
 }
 
-.ai-play-start-buttons button:hover {
+.ai-play-start-buttons button:hover:not(:disabled) {
     border-color: var(--lavender-grey);
 
     background: #f7f8fa;
+}
+
+.ai-play-start-buttons button:disabled {
+    cursor: default;
+
+    opacity: 0.45;
 }
 
 /* 현재 선택된 색 */
@@ -62,11 +68,19 @@
     font-weight: 600;
 }
 
-.ai-play-start-buttons button.black-active:hover,
-.ai-play-start-buttons button.white-active:hover {
+.ai-play-start-buttons button.black-active:hover:not(:disabled),
+.ai-play-start-buttons button.white-active:hover:not(:disabled) {
     color: var(--prussian-blue);
 
     background: var(--white);
+
+    border-color: var(--prussian-blue);
+}
+
+/* PASS */
+
+.ai-play-pass-button:hover:not(:disabled) {
+    color: var(--prussian-blue);
 
     border-color: var(--prussian-blue);
 }
@@ -188,4 +202,34 @@
 
 .winrate-chart-point {
     fill: var(--prussian-blue);
+}
+
+/* 대국 종료 */
+
+.game-over-message {
+    padding: 16px;
+
+    border: 1px solid var(--alabaster-grey);
+    border-radius: 8px;
+
+    background: var(--white);
+}
+
+.game-over-message strong {
+    display: block;
+
+    margin-bottom: 8px;
+
+    font-size: 16px;
+
+    color: var(--ink-black);
+}
+
+.game-over-message p {
+    margin: 0;
+
+    font-size: 14px;
+    line-height: 1.6;
+
+    color: var(--dusk-blue);
 }

@@ -35,7 +35,7 @@ function LoginPage() {
         const data: LoginResponse = await response.json();
 
         login(data.accessToken);
-        navigate("/problems");
+        navigate("/");
     }
 
     return (
