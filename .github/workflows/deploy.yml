@@ -54,15 +54,49 @@ jobs:
                   name: frontend-dist
                   path: dist/
 
+            # =========================
+            # Debug GitHub OIDC
+            # =========================
+            - name: Debug OIDC claims
+              shell: bash
+              run: |
+                  TOKEN_RESPONSE=$(curl -sS \
+                    -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+                    "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com")
+
+                  TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.value')
+
+                  PAYLOAD=$(echo "$TOKEN" | cut -d '.' -f2)
+                  PAYLOAD="${PAYLOAD//-/+}"
+                  PAYLOAD="${PAYLOAD//_/\/}"
+
+                  case $((${#PAYLOAD} % 4)) in
+                    2) PAYLOAD="${PAYLOAD}==" ;;
+                    3) PAYLOAD="${PAYLOAD}=" ;;
+                  esac
+
+                  echo "$PAYLOAD" \
+                    | base64 -d \
+                    | jq '{iss, aud, sub, repository, ref}'
+
+            # =========================
+            # AWS Authentication
+            # =========================
             - name: Configure AWS credentials
               uses: aws-actions/configure-aws-credentials@v4
               with:
                   role-to-assume: arn:aws:iam::194130477116:role/solvego-frontend-deployer
                   aws-region: ap-northeast-2
 
+            # =========================
+            # S3 Deploy
+            # =========================
             - name: Deploy to S3
               run: aws s3 sync dist/ s3://solvego-frontend --delete
 
+            # =========================
+            # CloudFront Cache Invalidation
+            # =========================
             - name: Invalidate CloudFront cache
               run: |
                   aws cloudfront create-invalidation \
