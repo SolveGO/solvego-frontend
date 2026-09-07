@@ -11,9 +11,32 @@ permissions:
 
 jobs:
     # =========================
-    # 1. Build
+    # 1. Test
+    # =========================
+    test:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: npm
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Run tests
+              run: npm run test:run
+
+    # =========================
+    # 2. Build
     # =========================
     build:
+        needs: test
         runs-on: ubuntu-latest
 
         steps:
@@ -41,7 +64,7 @@ jobs:
                   path: dist/
 
     # =========================
-    # 2. Deploy
+    # 3. Deploy
     # =========================
     deploy:
         needs: build

@@ -20,7 +20,7 @@
     color: var(--ink-black);
 }
 
-/* PASS / 흑 / 백으로 새 대국 시작 */
+/* PASS / 기권 / 흑 / 백으로 새 대국 시작 */
 
 .ai-play-start-buttons {
     display: flex;
@@ -117,18 +117,59 @@
     background: #f7f8fa;
 }
 
-.position-panel h2 {
-    margin: 0 0 24px;
+/* 형세 접기 / 펼치기 */
 
-    font-size: 20px;
+.position-panel-toggle {
+    width: 100%;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    padding: 0;
 
     color: var(--ink-black);
+    background: transparent;
+
+    border: none;
+
+    font: inherit;
+    font-size: 20px;
+    font-weight: 700;
+
+    cursor: pointer;
+}
+
+.position-panel-toggle:hover .position-panel-arrow {
+    color: var(--prussian-blue);
+}
+
+.position-panel-arrow {
+    font-size: 12px;
+
+    color: var(--lavender-grey);
+
+    transition: color 0.15s ease;
+}
+
+.position-panel-content {
+    margin-top: 24px;
+}
+
+/*
+ * 접힌 상태에서는 헤더만 남으므로
+ * 패널 높이도 자연스럽게 줄어든다.
+ */
+
+.position-panel.closed {
+    padding-bottom: 24px;
 }
 
 .position-empty {
     margin: 0;
 
     font-size: 14px;
+    line-height: 1.6;
 
     color: var(--lavender-grey);
 }

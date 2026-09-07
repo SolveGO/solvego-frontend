@@ -1,33 +1,27 @@
 import { useState } from "react";
 
 import GoBoard from "../../../components/GoBoard/GoBoard";
-import { authFetch } from "../../../api/api";
+
+import {
+    AiApiError,
+    requestAiNextMove,
+    type GameEndReason,
+    type GameMove,
+    type GameResult,
+    type Position,
+    type StoneColor,
+} from "../../../api/aiApi";
+
 import { playMove } from "../../../utils/goRules";
 
 import "./AiPlayPage.css";
 
-type Position = {
-    x: number;
-    y: number;
-};
-
-type StoneColor = "BLACK" | "WHITE";
-
-type GameMove = {
-    player: StoneColor;
-    position: Position | null;
-};
-
-type AiGameNextMoveResponse = {
-    move: Position | null;
-    winRate: number;
-    scoreLead: number;
-};
-
 type WinRatePoint = {
     turn: number;
-    blackWinRate: number;
+    playerWinRate: number;
 };
+
+type FrontGameEndReason = GameEndReason | "PLAYER_RESIGN";
 
 function WinRateChart({ history }: { history: WinRatePoint[] }) {
     const width = 260;
@@ -60,7 +54,7 @@ function WinRateChart({ history }: { history: WinRatePoint[] }) {
 
     const points = history
         .map((item, index) => {
-            return `${getX(index)},${getY(item.blackWinRate)}`;
+            return `${getX(index)},${getY(item.playerWinRate)}`;
         })
         .join(" ");
 
@@ -70,7 +64,7 @@ function WinRateChart({ history }: { history: WinRatePoint[] }) {
                 <svg
                     viewBox={`0 0 ${width} ${height}`}
                     role="img"
-                    aria-label="흑 승률 변화 그래프">
+                    aria-label="사용자 승률 변화 그래프">
                     {history.length >= 2 && (
                         <polyline
                             points={points}
@@ -82,7 +76,7 @@ function WinRateChart({ history }: { history: WinRatePoint[] }) {
                         <circle
                             key={item.turn}
                             cx={getX(index)}
-                            cy={getY(item.blackWinRate)}
+                            cy={getY(item.playerWinRate)}
                             r="3"
                             className="winrate-chart-point"
                         />
@@ -95,6 +89,7 @@ function WinRateChart({ history }: { history: WinRatePoint[] }) {
 
 function AiPlayPage() {
     const [blackStones, setBlackStones] = useState<Position[]>([]);
+
     const [whiteStones, setWhiteStones] = useState<Position[]>([]);
 
     const [lastMovePosition, setLastMovePosition] = useState<Position | null>(
@@ -105,7 +100,11 @@ function AiPlayPage() {
 
     const [isAiThinking, setIsAiThinking] = useState(false);
 
-    const [blackWinRate, setBlackWinRate] = useState<number | null>(null);
+    const [isGameStarted, setIsGameStarted] = useState(false);
+
+    const [isPositionOpen, setIsPositionOpen] = useState(true);
+
+    const [playerWinRate, setPlayerWinRate] = useState<number | null>(null);
 
     const [winRateHistory, setWinRateHistory] = useState<WinRatePoint[]>([]);
 
@@ -115,16 +114,59 @@ function AiPlayPage() {
 
     const [isGameOver, setIsGameOver] = useState(false);
 
+    const [gameResult, setGameResult] = useState<GameResult | null>(null);
+
+    const [gameEndReason, setGameEndReason] =
+        useState<FrontGameEndReason | null>(null);
+
+    const [lastAiScoreLead, setLastAiScoreLead] = useState<number | null>(null);
+
     function getAiColor(currentPlayerColor: StoneColor): StoneColor {
         return currentPlayerColor === "BLACK" ? "WHITE" : "BLACK";
     }
 
-    function convertToBlackWinRate(winRate: number, perspective: StoneColor) {
-        if (perspective === "BLACK") {
-            return winRate;
+    function determineResultFromAiScoreLead(scoreLead: number): GameResult {
+        if (scoreLead > 0) {
+            return "AI_WIN";
         }
 
-        return 1 - winRate;
+        if (scoreLead < 0) {
+            return "PLAYER_WIN";
+        }
+
+        return "DRAW";
+    }
+
+    function getGameResultMessage() {
+        if (gameResult === "PLAYER_WIN") {
+            return "승리했습니다.";
+        }
+
+        if (gameResult === "AI_WIN") {
+            return "AI가 승리했습니다.";
+        }
+
+        if (gameResult === "DRAW") {
+            return "무승부입니다.";
+        }
+
+        return "";
+    }
+
+    function getGameEndReasonMessage() {
+        if (gameEndReason === "AI_RESIGN") {
+            return "AI가 기권했습니다.";
+        }
+
+        if (gameEndReason === "DOUBLE_PASS") {
+            return "흑과 백이 연속으로 PASS했습니다.";
+        }
+
+        if (gameEndReason === "PLAYER_RESIGN") {
+            return "기권했습니다.";
+        }
+
+        return "";
     }
 
     function resetBoard() {
@@ -133,7 +175,7 @@ function AiPlayPage() {
 
         setLastMovePosition(null);
 
-        setBlackWinRate(null);
+        setPlayerWinRate(null);
         setWinRateHistory([]);
 
         setMoves([]);
@@ -141,6 +183,25 @@ function AiPlayPage() {
         setConsecutivePasses(0);
 
         setIsGameOver(false);
+
+        setGameResult(null);
+        setGameEndReason(null);
+
+        setLastAiScoreLead(null);
+    }
+
+    function updateWinRate(aiWinRate: number) {
+        const currentPlayerWinRate = 1 - aiWinRate;
+
+        setPlayerWinRate(currentPlayerWinRate);
+
+        setWinRateHistory((prev) => [
+            ...prev,
+            {
+                turn: prev.length + 1,
+                playerWinRate: currentPlayerWinRate,
+            },
+        ]);
     }
 
     async function requestAiMove(
@@ -153,71 +214,91 @@ function AiPlayPage() {
         setIsAiThinking(true);
 
         try {
-            const response = await authFetch("/api/ai/game/next-move", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    moves: currentMoves,
-                }),
-            });
+            const data = await requestAiNextMove(currentMoves);
 
-            if (!response.ok) {
-                if (response.status === 502) {
-                    alert("AI 서버에 연결할 수 없습니다.");
-                    return;
+            /*
+             * 백엔드의 winRate는 AI 기준.
+             * 화면에서는 항상 사용자 기준으로 변환한다.
+             */
+            updateWinRate(data.winRate);
+
+            setLastAiScoreLead(data.scoreLead);
+
+            /*
+             * 대국 종료
+             */
+            if (data.gameEnded) {
+                /*
+                 * AI가 두 번째 PASS를 한 경우
+                 * AI의 PASS도 수순에 추가한다.
+                 */
+                if (
+                    data.endReason === "DOUBLE_PASS" &&
+                    data.moveType === "PASS"
+                ) {
+                    const nextMoves: GameMove[] = [
+                        ...currentMoves,
+                        {
+                            player: aiColor,
+                            moveType: "PASS",
+                            position: null,
+                        },
+                    ];
+
+                    setMoves(nextMoves);
+
+                    setLastMovePosition(null);
+
+                    setConsecutivePasses(currentConsecutivePasses + 1);
                 }
 
-                if (response.status === 504) {
-                    alert("AI 응답 시간이 초과되었습니다.");
-                    return;
-                }
+                setGameResult(data.result);
+                setGameEndReason(data.endReason);
 
-                alert("AI의 수를 가져오지 못했습니다.");
+                setIsGameOver(true);
+                setIsGameStarted(false);
+
                 return;
             }
-
-            const data: AiGameNextMoveResponse = await response.json();
-
-            const currentBlackWinRate = convertToBlackWinRate(
-                data.winRate,
-                aiColor,
-            );
 
             /*
              * AI PASS
              */
-            if (data.move === null) {
+            if (data.moveType === "PASS") {
                 const nextMoves: GameMove[] = [
                     ...currentMoves,
                     {
                         player: aiColor,
+                        moveType: "PASS",
                         position: null,
                     },
                 ];
-
-                const nextConsecutivePasses = currentConsecutivePasses + 1;
 
                 setMoves(nextMoves);
 
                 setLastMovePosition(null);
 
-                setConsecutivePasses(nextConsecutivePasses);
+                setConsecutivePasses(currentConsecutivePasses + 1);
 
-                setBlackWinRate(currentBlackWinRate);
+                return;
+            }
 
-                setWinRateHistory((prev) => [
-                    ...prev,
-                    {
-                        turn: prev.length + 1,
-                        blackWinRate: currentBlackWinRate,
-                    },
-                ]);
+            /*
+             * 종료되지 않은 정상 응답은
+             * PLAY여야 한다.
+             */
+            if (data.moveType !== "PLAY") {
+                alert("AI가 올바르지 않은 응답을 반환했습니다.");
 
-                if (nextConsecutivePasses >= 2) {
-                    setIsGameOver(true);
-                }
+                return;
+            }
+
+            /*
+             * PLAY인데 좌표가 없으면
+             * 잘못된 응답이다.
+             */
+            if (data.move === null) {
+                alert("AI가 착수 좌표를 반환하지 않았습니다.");
 
                 return;
             }
@@ -234,6 +315,7 @@ function AiPlayPage() {
 
             if (aiMoveResult === null) {
                 alert("AI가 유효하지 않은 수를 반환했습니다.");
+
                 return;
             }
 
@@ -241,6 +323,7 @@ function AiPlayPage() {
                 ...currentMoves,
                 {
                     player: aiColor,
+                    moveType: "PLAY",
                     position: data.move,
                 },
             ];
@@ -254,19 +337,26 @@ function AiPlayPage() {
             setMoves(nextMoves);
 
             /*
-             * 실제 착수가 발생하면 연속 PASS는 끊긴다.
+             * 실제 착수가 발생하면
+             * 연속 PASS는 끊긴다.
              */
             setConsecutivePasses(0);
+        } catch (error) {
+            if (error instanceof AiApiError) {
+                if (error.status === 502) {
+                    alert("AI 서버에 연결할 수 없습니다.");
 
-            setBlackWinRate(currentBlackWinRate);
+                    return;
+                }
 
-            setWinRateHistory((prev) => [
-                ...prev,
-                {
-                    turn: prev.length + 1,
-                    blackWinRate: currentBlackWinRate,
-                },
-            ]);
+                if (error.status === 504) {
+                    alert("AI 응답 시간이 초과되었습니다.");
+
+                    return;
+                }
+            }
+
+            alert("AI의 수를 가져오지 못했습니다.");
         } finally {
             setIsAiThinking(false);
         }
@@ -277,11 +367,39 @@ function AiPlayPage() {
             return;
         }
 
+        let currentPlayerColor = playerColor;
+
+        let currentBlackStones = blackStones;
+
+        let currentWhiteStones = whiteStones;
+
+        let currentMoves = moves;
+
+        /*
+         * 게임 시작 전에 바둑판을 바로 클릭하면
+         * 자동으로 흑으로 새 대국 시작
+         */
+        if (!isGameStarted) {
+            currentPlayerColor = "BLACK";
+
+            currentBlackStones = [];
+            currentWhiteStones = [];
+            currentMoves = [];
+
+            resetBoard();
+
+            setPlayerColor("BLACK");
+            setIsGameStarted(true);
+        }
+
+        /*
+         * 사용자 착수
+         */
         const userMoveResult = playMove(
-            blackStones,
-            whiteStones,
+            currentBlackStones,
+            currentWhiteStones,
             position,
-            playerColor,
+            currentPlayerColor,
         );
 
         if (userMoveResult === null) {
@@ -289,12 +407,14 @@ function AiPlayPage() {
         }
 
         const nextBlackStones = userMoveResult.blackStones;
+
         const nextWhiteStones = userMoveResult.whiteStones;
 
         const nextMoves: GameMove[] = [
-            ...moves,
+            ...currentMoves,
             {
-                player: playerColor,
+                player: currentPlayerColor,
+                moveType: "PLAY",
                 position,
             },
         ];
@@ -307,13 +427,9 @@ function AiPlayPage() {
 
         setMoves(nextMoves);
 
-        /*
-         * 사용자가 실제로 착수했으므로
-         * 이전 PASS 기록은 끊긴다.
-         */
         setConsecutivePasses(0);
 
-        const aiColor = getAiColor(playerColor);
+        const aiColor = getAiColor(currentPlayerColor);
 
         await requestAiMove(
             nextBlackStones,
@@ -325,7 +441,7 @@ function AiPlayPage() {
     }
 
     async function handlePass() {
-        if (isAiThinking || isGameOver) {
+        if (isAiThinking || isGameOver || !isGameStarted) {
             return;
         }
 
@@ -333,6 +449,7 @@ function AiPlayPage() {
             ...moves,
             {
                 player: playerColor,
+                moveType: "PASS",
                 position: null,
             },
         ];
@@ -346,11 +463,22 @@ function AiPlayPage() {
         setConsecutivePasses(nextConsecutivePasses);
 
         /*
-         * 직전에 AI가 PASS했다면
-         * 사용자 PASS로 2연속 PASS가 되어 대국 종료.
+         * AI가 직전에 PASS했고
+         * 사용자가 두 번째 PASS
          */
         if (nextConsecutivePasses >= 2) {
+            const result =
+                lastAiScoreLead === null
+                    ? null
+                    : determineResultFromAiScoreLead(lastAiScoreLead);
+
+            setGameResult(result);
+
+            setGameEndReason("DOUBLE_PASS");
+
             setIsGameOver(true);
+            setIsGameStarted(false);
+
             return;
         }
 
@@ -365,10 +493,20 @@ function AiPlayPage() {
         );
     }
 
+    function handleResign() {
+        if (isAiThinking || isGameOver || !isGameStarted) {
+            return;
+        }
+
+        setGameResult("AI_WIN");
+
+        setGameEndReason("PLAYER_RESIGN");
+
+        setIsGameOver(true);
+        setIsGameStarted(false);
+    }
+
     async function handleStartGame(color: StoneColor) {
-        /*
-         * AI 응답 대기 중에는 새 대국 시작을 막는다.
-         */
         if (isAiThinking) {
             return;
         }
@@ -377,15 +515,19 @@ function AiPlayPage() {
 
         resetBoard();
 
+        setIsGameStarted(true);
+
         /*
-         * 내가 흑이면 내가 첫 수를 둔다.
+         * 사용자가 흑이면
+         * 사용자가 먼저 착수
          */
         if (color === "BLACK") {
             return;
         }
 
         /*
-         * 내가 백이면 AI가 흑으로 첫 수를 둔다.
+         * 사용자가 백이면
+         * AI가 흑으로 먼저 착수
          */
         await requestAiMove([], [], [], "BLACK", 0);
     }
@@ -396,28 +538,46 @@ function AiPlayPage() {
                 <h1>AI 대국</h1>
 
                 <div className="ai-play-start-buttons">
-                    <button
-                        className="ai-play-pass-button"
-                        onClick={handlePass}
-                        disabled={isAiThinking || isGameOver}>
-                        PASS
-                    </button>
+                    {!isGameStarted ? (
+                        <>
+                            <button
+                                className={
+                                    playerColor === "BLACK"
+                                        ? "black-active"
+                                        : ""
+                                }
+                                onClick={() => handleStartGame("BLACK")}
+                                disabled={isAiThinking}>
+                                흑으로 시작
+                            </button>
 
-                    <button
-                        className={
-                            playerColor === "BLACK" ? "black-active" : ""
-                        }
-                        onClick={() => handleStartGame("BLACK")}>
-                        흑으로 시작
-                    </button>
+                            <button
+                                className={
+                                    playerColor === "WHITE"
+                                        ? "white-active"
+                                        : ""
+                                }
+                                onClick={() => handleStartGame("WHITE")}
+                                disabled={isAiThinking}>
+                                백으로 시작
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <button
+                                className="ai-play-pass-button"
+                                onClick={handlePass}
+                                disabled={isAiThinking || isGameOver}>
+                                PASS
+                            </button>
 
-                    <button
-                        className={
-                            playerColor === "WHITE" ? "white-active" : ""
-                        }
-                        onClick={() => handleStartGame("WHITE")}>
-                        백으로 시작
-                    </button>
+                            <button
+                                onClick={handleResign}
+                                disabled={isAiThinking || isGameOver}>
+                                기권
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -436,41 +596,65 @@ function AiPlayPage() {
                     />
                 </div>
 
-                <div className="position-panel">
-                    <h2>형세</h2>
+                <div
+                    className={`position-panel ${
+                        isPositionOpen ? "open" : "closed"
+                    }`}>
+                    <button
+                        className="position-panel-toggle"
+                        type="button"
+                        onClick={() => setIsPositionOpen((prev) => !prev)}
+                        aria-expanded={isPositionOpen}>
+                        <span>형세</span>
 
-                    {isGameOver ? (
-                        <div className="game-over-message">
-                            <strong>대국 종료</strong>
-                            <p>흑과 백이 연속으로 PASS했습니다.</p>
+                        <span className="position-panel-arrow">
+                            {isPositionOpen ? "▲" : "▼"}
+                        </span>
+                    </button>
+
+                    {isPositionOpen && (
+                        <div className="position-panel-content">
+                            {isGameOver ? (
+                                <div className="game-over-message">
+                                    <strong>대국 종료</strong>
+
+                                    <p>{getGameResultMessage()}</p>
+
+                                    <p>{getGameEndReasonMessage()}</p>
+                                </div>
+                            ) : playerWinRate === null ? (
+                                <p className="position-empty">
+                                    {isAiThinking
+                                        ? "AI가 생각하고 있습니다."
+                                        : isGameStarted
+                                          ? "첫 수를 두어주세요."
+                                          : "바둑판을 클릭하면 흑으로 바로 시작할 수 있습니다."}
+                                </p>
+                            ) : (
+                                <>
+                                    <div className="position-rate-row">
+                                        <span>내 승률</span>
+
+                                        <strong>
+                                            {(playerWinRate * 100).toFixed(1)}%
+                                        </strong>
+                                    </div>
+
+                                    <div className="position-bar">
+                                        <div
+                                            className="position-bar-fill"
+                                            style={{
+                                                width: `${
+                                                    playerWinRate * 100
+                                                }%`,
+                                            }}
+                                        />
+                                    </div>
+
+                                    <WinRateChart history={winRateHistory} />
+                                </>
+                            )}
                         </div>
-                    ) : blackWinRate === null ? (
-                        <p className="position-empty">
-                            {isAiThinking
-                                ? "AI가 생각하고 있습니다."
-                                : "첫 수를 두어주세요."}
-                        </p>
-                    ) : (
-                        <>
-                            <div className="position-rate-row">
-                                <span>흑 승률</span>
-
-                                <strong>
-                                    {(blackWinRate * 100).toFixed(1)}%
-                                </strong>
-                            </div>
-
-                            <div className="position-bar">
-                                <div
-                                    className="position-bar-fill"
-                                    style={{
-                                        width: `${blackWinRate * 100}%`,
-                                    }}
-                                />
-                            </div>
-
-                            <WinRateChart history={winRateHistory} />
-                        </>
                     )}
                 </div>
             </div>
