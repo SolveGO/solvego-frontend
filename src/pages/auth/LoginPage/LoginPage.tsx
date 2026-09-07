@@ -38,6 +38,10 @@ function LoginPage() {
         navigate("/");
     }
 
+    function handleSignup() {
+        navigate("/signup");
+    }
+
     return (
         <div className="auth-page">
             <div className="auth-card">
@@ -67,6 +71,14 @@ function LoginPage() {
                     <button className="auth-button" onClick={handleLogin}>
                         로그인
                     </button>
+
+                    <div className="auth-signup">
+                        <span>아직 회원이 아니신가요?</span>
+
+                        <button type="button" onClick={handleSignup}>
+                            회원가입
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

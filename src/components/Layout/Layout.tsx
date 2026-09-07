@@ -31,31 +31,21 @@ function Layout() {
                         홈
                     </NavLink>
 
-                    {isLoggedIn && (
-                        <NavLink to="/ai-play" className={navClassName}>
-                            AI 대국
-                        </NavLink>
-                    )}
+                    <NavLink to="/ai-play" className={navClassName}>
+                        AI 대국
+                    </NavLink>
 
                     <NavLink to="/problems" end className={navClassName}>
                         문제 풀기
                     </NavLink>
 
-                    {isLoggedIn && (
-                        <>
-                            <NavLink
-                                to="/wrong-problems"
-                                className={navClassName}>
-                                오답 노트
-                            </NavLink>
+                    <NavLink to="/wrong-problems" className={navClassName}>
+                        오답 노트
+                    </NavLink>
 
-                            <NavLink
-                                to="/problems/new"
-                                className={navClassName}>
-                                문제 만들기
-                            </NavLink>
-                        </>
-                    )}
+                    <NavLink to="/problems/new" className={navClassName}>
+                        문제 만들기
+                    </NavLink>
                 </nav>
 
                 <div className="sidebar-account">

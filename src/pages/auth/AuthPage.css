@@ -16,7 +16,6 @@
     background: var(--white);
 
     border: 1px solid var(--alabaster-grey);
-
     border-radius: 12px;
 }
 
@@ -30,7 +29,6 @@
 
 .auth-form {
     display: flex;
-
     flex-direction: column;
 
     gap: 16px;
@@ -38,7 +36,6 @@
 
 .auth-field {
     display: flex;
-
     flex-direction: column;
 
     gap: 8px;
@@ -46,7 +43,6 @@
 
 .auth-field label {
     font-size: 14px;
-
     font-weight: 600;
 
     color: var(--dusk-blue);
@@ -55,10 +51,13 @@
 .auth-field input {
     padding: 12px 14px;
 
+    color: var(--ink-black);
+
     font: inherit;
 
-    border: 1px solid var(--alabaster-grey);
+    background: var(--white);
 
+    border: 1px solid var(--alabaster-grey);
     border-radius: 8px;
 
     outline: none;
@@ -66,6 +65,23 @@
 
 .auth-field input:focus {
     border-color: var(--dusk-blue);
+}
+
+/* Chrome / Safari 자동완성 배경색 제거 */
+.auth-field input:-webkit-autofill,
+.auth-field input:-webkit-autofill:hover,
+.auth-field input:-webkit-autofill:focus,
+.auth-field input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px var(--white) inset;
+    -webkit-text-fill-color: var(--ink-black);
+
+    transition: background-color 5000s ease-in-out 0s;
+}
+
+.auth-helper-text {
+    font-size: 12px;
+
+    color: var(--dusk-blue);
 }
 
 .auth-button {
@@ -76,14 +92,48 @@
     color: var(--white);
 
     font: inherit;
-
     font-weight: 600;
 
     background: var(--prussian-blue);
 
     border: none;
-
     border-radius: 8px;
 
     cursor: pointer;
+}
+
+.auth-signup,
+.auth-login-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    gap: 8px;
+
+    margin-top: 4px;
+
+    font-size: 14px;
+
+    color: var(--dusk-blue);
+}
+
+.auth-signup button,
+.auth-login-link button {
+    padding: 0;
+
+    color: var(--prussian-blue);
+
+    font: inherit;
+    font-weight: 700;
+
+    background: none;
+
+    border: none;
+
+    cursor: pointer;
+}
+
+.auth-signup button:hover,
+.auth-login-link button:hover {
+    text-decoration: underline;
 }
