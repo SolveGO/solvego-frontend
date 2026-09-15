@@ -142,8 +142,7 @@
     background: #f5eee5;
 }
 
-.ai-candidate-card strong,
-.ai-candidate-card small {
+.ai-candidate-card strong {
     grid-column: 1 / -1;
 }
 

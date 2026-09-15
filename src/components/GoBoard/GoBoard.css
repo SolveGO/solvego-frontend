@@ -31,18 +31,19 @@
     z-index: 5;
     display: grid;
     place-items: center;
-    width: 22px;
-    height: 22px;
-    border: 2px solid #fff;
+    width: 24px;
+    height: 24px;
+    box-sizing: border-box;
+    border: 2px solid #b74d12;
     border-radius: 50%;
-    background: #e0712b;
-    color: #fff;
+    background: rgb(255 247 237 / 72%);
+    color: #7c2d12;
     font-size: 12px;
     font-weight: 800;
     line-height: 1;
     transform: translate(-50%, -50%);
     pointer-events: none;
-    box-shadow: 0 1px 4px rgb(0 0 0 / 35%);
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 70%);
 }
 
 .go-point::before {

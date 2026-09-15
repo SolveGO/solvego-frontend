@@ -233,6 +233,14 @@ describe("AiPlayPage", () => {
         fireEvent.click(explainButton);
         expect(requestAiExplanation).toHaveBeenCalledTimes(1);
         expect(requestAiExplanation).toHaveBeenCalledWith("signed-evidence");
+        expect(JSON.parse(screen.getByTestId("candidate-markers").textContent!)).toEqual([]);
+        expect(screen.queryByText("A 후보가 가장 높은 평가를 받았습니다.")).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "왜 이 수?" }));
+        expect(requestAiExplanation).toHaveBeenCalledTimes(1);
+        expect(JSON.parse(screen.getByTestId("candidate-markers").textContent!)).toHaveLength(2);
+        expect(screen.getByText("A 후보가 가장 높은 평가를 받았습니다.")).toBeInTheDocument();
+        expect(screen.queryByText(/방문 수/)).not.toBeInTheDocument();
     });
 
     it("다음 사용자 착수는 이전 후보와 해설을 제거한다", async () => {

@@ -326,16 +326,13 @@ function AiPlayPage() {
         return `${columns[candidate.move.x]}${19 - candidate.move.y}`;
     }
 
-    async function handleExplain() {
-        if (!lastEvidenceToken || lastAiCandidates.length === 0) return;
-        setShowCandidateMarkers(true);
+    async function loadExplanation(token: string) {
         if (
             (explanationState.status === "LOADING" ||
                 explanationState.status === "SUCCESS") &&
-            explanationState.token === lastEvidenceToken
+            explanationState.token === token
         ) return;
 
-        const token = lastEvidenceToken;
         setExplanationState({ status: "LOADING", token });
         try {
             const data = await requestAiExplanation(token);
@@ -351,6 +348,18 @@ function AiPlayPage() {
                     : current,
             );
         }
+    }
+
+    function handleExplain() {
+        if (!lastEvidenceToken || lastAiCandidates.length === 0) return;
+
+        if (showCandidateMarkers) {
+            setShowCandidateMarkers(false);
+            return;
+        }
+
+        setShowCandidateMarkers(true);
+        void loadExplanation(lastEvidenceToken);
     }
 
     function updateWinRate(aiWinRate: number) {
@@ -705,8 +714,8 @@ function AiPlayPage() {
                             className="ai-explanation-button"
                             type="button"
                             onClick={handleExplain}
-                            disabled={explanationState.status === "LOADING"}>
-                            왜 이 수?
+                            aria-expanded={showCandidateMarkers}>
+                            {showCandidateMarkers ? "해설 닫기" : "왜 이 수?"}
                         </button>
 
                         {showCandidateMarkers && (
@@ -719,7 +728,6 @@ function AiPlayPage() {
                                             </strong>
                                             <span>예상 승률 {(candidate.winRate * 100).toFixed(1)}%</span>
                                             <span>예상 집 차이 {candidate.scoreLead >= 0 ? "+" : ""}{candidate.scoreLead.toFixed(1)}</span>
-                                            <small>방문 수 {candidate.visits}</small>
                                         </div>
                                     ))}
                                 </div>
@@ -728,7 +736,15 @@ function AiPlayPage() {
                                 {explanationState.status === "ERROR" && (
                                     <div role="alert">
                                         <p>{explanationState.message}</p>
-                                        <button type="button" onClick={handleExplain}>다시 시도</button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (lastEvidenceToken) {
+                                                    void loadExplanation(lastEvidenceToken);
+                                                }
+                                            }}>
+                                            다시 시도
+                                        </button>
                                     </div>
                                 )}
                                 {explanationState.status === "SUCCESS" && (
