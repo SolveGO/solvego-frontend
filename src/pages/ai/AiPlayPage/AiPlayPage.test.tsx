@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import AiPlayPage from "./AiPlayPage";
 
-import { AiApiError, requestAiNextMove, type AiGameNextMoveResponse } from "../../../api/aiApi";
+import { AiApiError, requestAiExplanation, requestAiNextMove, type AiGameNextMoveResponse } from "../../../api/aiApi";
 
 import { playMove } from "../../../utils/goRules";
 
@@ -17,14 +17,16 @@ import { playMove } from "../../../utils/goRules";
  */
 vi.mock("../../../components/GoBoard/GoBoard", () => ({
     default: ({
-        onSelect, blackStones, whiteStones,
+        onSelect, blackStones, whiteStones, candidateMarkers,
     }: {
         blackStones: { x: number; y: number }[];
         whiteStones: { x: number; y: number }[];
         onSelect: (position: { x: number; y: number }) => void;
+        candidateMarkers?: Array<{ position: { x: number; y: number }; label: string }>;
     }) => (
         <>
         <output data-testid="board">{JSON.stringify({ blackStones, whiteStones })}</output>
+        <output data-testid="candidate-markers">{JSON.stringify(candidateMarkers ?? [])}</output>
         <button
             type="button"
             onClick={() =>
@@ -51,6 +53,7 @@ vi.mock("../../../api/aiApi", async () => {
     return {
         ...actual,
         requestAiNextMove: vi.fn(),
+        requestAiExplanation: vi.fn(),
     };
 });
 
@@ -194,6 +197,89 @@ describe("AiPlayPage", () => {
                 name: "PASS",
             }),
         ).toBeInTheDocument();
+    });
+
+    it("왜 이 수를 누르면 후보 마커를 표시하고 동일 턴 해설을 재사용한다", async () => {
+        vi.mocked(requestAiNextMove).mockResolvedValue({
+            moveType: "PLAY", move: { x: 15, y: 15 },
+            winRate: 0.6, scoreLead: 1.5,
+            gameEnded: false, result: null, endReason: null,
+            evidenceToken: "signed-evidence",
+            candidates: [
+                { id: "c1", rank: 1, moveType: "PLAY", move: { x: 15, y: 15 }, winRate: 0.6, scoreLead: 1.5, visits: 3, pv: [] },
+                { id: "c2", rank: 2, moveType: "PLAY", move: { x: 3, y: 15 }, winRate: 0.55, scoreLead: 0.8, visits: 2, pv: [] },
+            ],
+        });
+        vi.mocked(requestAiExplanation).mockResolvedValue({
+            source: "LLM", perspective: "WHITE", candidates: [],
+            explanation: {
+                summary: "A 후보가 가장 높은 평가를 받았습니다.",
+                comparison: "B 후보도 함께 비교했습니다.",
+                pvExplanation: "가능한 예상 진행입니다.",
+                limitation: "낮은 탐색량의 결과입니다.",
+                evidenceRefs: ["c1", "c2"],
+            },
+        });
+        render(<AiPlayPage />);
+        fireEvent.click(screen.getByRole("button", { name: "바둑판 클릭" }));
+        const explainButton = await screen.findByRole("button", { name: "왜 이 수?" });
+
+        fireEvent.click(explainButton);
+        expect(JSON.parse(screen.getByTestId("candidate-markers").textContent!)).toEqual([
+            { position: { x: 15, y: 15 }, label: "A" },
+            { position: { x: 3, y: 15 }, label: "B" },
+        ]);
+        await screen.findByText("A 후보가 가장 높은 평가를 받았습니다.");
+        fireEvent.click(explainButton);
+        expect(requestAiExplanation).toHaveBeenCalledTimes(1);
+        expect(requestAiExplanation).toHaveBeenCalledWith("signed-evidence");
+    });
+
+    it("다음 사용자 착수는 이전 후보와 해설을 제거한다", async () => {
+        vi.mocked(requestAiNextMove).mockResolvedValue({
+            moveType: "PLAY", move: { x: 15, y: 15 }, winRate: 0.6, scoreLead: 1,
+            gameEnded: false, result: null, endReason: null,
+            evidenceToken: "token", candidates: [
+                { id: "c1", rank: 1, moveType: "PLAY", move: { x: 15, y: 15 }, winRate: 0.6, scoreLead: 1, visits: 5, pv: [] },
+            ],
+        });
+        vi.mocked(requestAiExplanation).mockRejectedValue(new Error("LLM failed"));
+        render(<AiPlayPage />);
+        fireEvent.click(screen.getByRole("button", { name: "바둑판 클릭" }));
+        fireEvent.click(await screen.findByRole("button", { name: "왜 이 수?" }));
+        await screen.findByRole("alert");
+        expect(screen.getByRole("button", { name: "PASS" })).toBeEnabled();
+        expect(screen.getByText("40.0%")).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "바둑판 클릭" }));
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+        expect(JSON.parse(screen.getByTestId("candidate-markers").textContent!)).toEqual([]);
+    });
+
+    it("새 대국을 시작하면 이전 후보 표시를 제거한다", async () => {
+        vi.mocked(requestAiNextMove).mockResolvedValue({
+            moveType: "PLAY", move: { x: 15, y: 15 }, winRate: 0.6, scoreLead: 1,
+            gameEnded: false, result: null, endReason: null,
+            evidenceToken: "token", candidates: [
+                { id: "c1", rank: 1, moveType: "PLAY", move: { x: 15, y: 15 }, winRate: 0.6, scoreLead: 1, visits: 5, pv: [] },
+            ],
+        });
+        vi.mocked(requestAiExplanation).mockResolvedValue({
+            source: "TEMPLATE", perspective: "WHITE", candidates: [],
+            explanation: {
+                summary: "요약", comparison: "비교", pvExplanation: "진행",
+                limitation: "한계", evidenceRefs: ["c1"],
+            },
+        });
+        render(<AiPlayPage />);
+        fireEvent.click(screen.getByRole("button", { name: "바둑판 클릭" }));
+        fireEvent.click(await screen.findByRole("button", { name: "왜 이 수?" }));
+        await screen.findByText("요약");
+        fireEvent.click(screen.getByRole("button", { name: "기권" }));
+        fireEvent.click(screen.getByRole("button", { name: "흑으로 시작" }));
+
+        expect(screen.queryByRole("button", { name: "왜 이 수?" })).not.toBeInTheDocument();
+        expect(JSON.parse(screen.getByTestId("candidate-markers").textContent!)).toEqual([]);
     });
 
     it("사용자가 기권하면 AI 승리로 대국을 종료한다", () => {

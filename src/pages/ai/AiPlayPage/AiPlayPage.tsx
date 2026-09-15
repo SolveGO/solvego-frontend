@@ -4,7 +4,10 @@ import GoBoard from "../../../components/GoBoard/GoBoard";
 
 import {
     AiApiError,
+    requestAiExplanation,
     requestAiNextMove,
+    type AiCandidate,
+    type AiExplanation,
     type AiGameNextMoveResponse,
     type GameEndReason,
     type GameMove,
@@ -37,6 +40,33 @@ type GamePhase =
     | { status: "AI_THINKING"; turn: AiTurn }
     | { status: "AI_FAILED"; turn: AiTurn; message: string };
 
+type ExplanationState =
+    | { status: "IDLE" }
+    | { status: "LOADING"; token: string }
+    | { status: "SUCCESS"; token: string; data: AiExplanation }
+    | { status: "ERROR"; token: string; message: string };
+
+function isBoardPosition(value: unknown): value is Position {
+    if (!value || typeof value !== "object") return false;
+    const position = value as Position;
+    return Number.isInteger(position.x) && Number.isInteger(position.y) &&
+        position.x >= 0 && position.x < 19 && position.y >= 0 && position.y < 19;
+}
+
+function isValidCandidate(value: unknown, expectedRank: number): value is AiCandidate {
+    if (!value || typeof value !== "object") return false;
+    const candidate = value as AiCandidate;
+    const moveIsValid = candidate.moveType === "PASS"
+        ? candidate.move === null
+        : candidate.moveType === "PLAY" && isBoardPosition(candidate.move);
+    return candidate.id === `c${expectedRank}` && candidate.rank === expectedRank &&
+        moveIsValid && Number.isFinite(candidate.winRate) &&
+        candidate.winRate >= 0 && candidate.winRate <= 1 &&
+        Number.isFinite(candidate.scoreLead) && Number.isInteger(candidate.visits) &&
+        candidate.visits >= 0 && Array.isArray(candidate.pv) &&
+        candidate.pv.every((move) => move === null || isBoardPosition(move));
+}
+
 // JSON 응답은 TypeScript 타입만으로 보장되지 않는다.
 function isValidAiResponse(
     value: unknown,
@@ -53,6 +83,24 @@ function isValidAiResponse(
         typeof data.gameEnded !== "boolean"
     ) {
         return false;
+    }
+
+    const hasCandidates = data.candidates !== undefined;
+    const hasEvidenceToken = data.evidenceToken !== undefined;
+    if (hasCandidates !== hasEvidenceToken) return false;
+    if (hasCandidates) {
+        if (!Array.isArray(data.candidates) || data.candidates.length < 1 ||
+            data.candidates.length > 3 || typeof data.evidenceToken !== "string" ||
+            data.evidenceToken.length === 0 ||
+            !data.candidates.every((candidate, index) =>
+                isValidCandidate(candidate, index + 1))) return false;
+        if (data.endReason !== "AI_RESIGN") {
+            const best = data.candidates[0];
+            if (best.moveType !== data.moveType ||
+                (best.move === null) !== (data.move === null) ||
+                (best.move !== null && data.move !== null &&
+                    (best.move.x !== data.move.x || best.move.y !== data.move.y))) return false;
+        }
     }
 
     if (data.gameEnded) {
@@ -189,6 +237,11 @@ function AiPlayPage() {
         useState<FrontGameEndReason | null>(null);
 
     const [lastAiScoreLead, setLastAiScoreLead] = useState<number | null>(null);
+    const [lastAiCandidates, setLastAiCandidates] = useState<AiCandidate[]>([]);
+    const [lastEvidenceToken, setLastEvidenceToken] = useState<string | null>(null);
+    const [showCandidateMarkers, setShowCandidateMarkers] = useState(false);
+    const [explanationState, setExplanationState] =
+        useState<ExplanationState>({ status: "IDLE" });
 
     function getAiColor(currentPlayerColor: StoneColor): StoneColor {
         return currentPlayerColor === "BLACK" ? "WHITE" : "BLACK";
@@ -257,6 +310,47 @@ function AiPlayPage() {
         setGameEndReason(null);
 
         setLastAiScoreLead(null);
+        clearExplanation();
+    }
+
+    function clearExplanation() {
+        setLastAiCandidates([]);
+        setLastEvidenceToken(null);
+        setShowCandidateMarkers(false);
+        setExplanationState({ status: "IDLE" });
+    }
+
+    function formatPosition(candidate: AiCandidate) {
+        if (candidate.moveType === "PASS" || candidate.move === null) return "PASS";
+        const columns = "ABCDEFGHJKLMNOPQRST";
+        return `${columns[candidate.move.x]}${19 - candidate.move.y}`;
+    }
+
+    async function handleExplain() {
+        if (!lastEvidenceToken || lastAiCandidates.length === 0) return;
+        setShowCandidateMarkers(true);
+        if (
+            (explanationState.status === "LOADING" ||
+                explanationState.status === "SUCCESS") &&
+            explanationState.token === lastEvidenceToken
+        ) return;
+
+        const token = lastEvidenceToken;
+        setExplanationState({ status: "LOADING", token });
+        try {
+            const data = await requestAiExplanation(token);
+            setExplanationState((current) =>
+                lastEvidenceToken === token && current.status === "LOADING"
+                    ? { status: "SUCCESS", token, data }
+                    : current,
+            );
+        } catch {
+            setExplanationState((current) =>
+                current.status === "LOADING" && current.token === token
+                    ? { status: "ERROR", token, message: "해설을 불러오지 못했습니다." }
+                    : current,
+            );
+        }
     }
 
     function updateWinRate(aiWinRate: number) {
@@ -322,6 +416,10 @@ function AiPlayPage() {
             );
             updateWinRate(data.winRate);
             setLastAiScoreLead(data.scoreLead);
+            setLastAiCandidates(data.candidates ?? []);
+            setLastEvidenceToken(data.evidenceToken ?? null);
+            setShowCandidateMarkers(false);
+            setExplanationState({ status: "IDLE" });
             setGameResult(data.result);
             setGameEndReason(data.endReason);
             setPhase({ status: data.gameEnded ? "ENDED" : "PLAYER_TURN" });
@@ -352,6 +450,7 @@ function AiPlayPage() {
         if (!canSelectBoard || requestInFlight.current) {
             return;
         }
+        clearExplanation();
 
         let currentPlayerColor = playerColor;
 
@@ -430,6 +529,7 @@ function AiPlayPage() {
         if (!canPlay || requestInFlight.current) {
             return;
         }
+        clearExplanation();
 
         const nextMoves: GameMove[] = [
             ...moves,
@@ -585,9 +685,64 @@ function AiPlayPage() {
                         blackStones={blackStones}
                         whiteStones={whiteStones}
                         lastMovePosition={lastMovePosition}
+                        candidateMarkers={
+                            showCandidateMarkers
+                                ? lastAiCandidates.flatMap((candidate) =>
+                                    candidate.move === null ? [] : [{
+                                        position: candidate.move,
+                                        label: String.fromCharCode(64 + candidate.rank),
+                                    }])
+                                : []
+                        }
                         onSelect={handleBoardSelect}
                     />
                 </div>
+
+                <div className="ai-play-side-panels">
+                {lastEvidenceToken && lastAiCandidates.length > 0 && !isAiThinking && (
+                    <section className="ai-explanation-panel">
+                        <button
+                            className="ai-explanation-button"
+                            type="button"
+                            onClick={handleExplain}
+                            disabled={explanationState.status === "LOADING"}>
+                            왜 이 수?
+                        </button>
+
+                        {showCandidateMarkers && (
+                            <div className="ai-explanation-content">
+                                <div className="ai-candidate-list">
+                                    {lastAiCandidates.map((candidate) => (
+                                        <div className="ai-candidate-card" key={candidate.id}>
+                                            <strong>
+                                                {String.fromCharCode(64 + candidate.rank)} {formatPosition(candidate)}
+                                            </strong>
+                                            <span>예상 승률 {(candidate.winRate * 100).toFixed(1)}%</span>
+                                            <span>예상 집 차이 {candidate.scoreLead >= 0 ? "+" : ""}{candidate.scoreLead.toFixed(1)}</span>
+                                            <small>방문 수 {candidate.visits}</small>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {explanationState.status === "LOADING" && <p>해설을 만들고 있습니다.</p>}
+                                {explanationState.status === "ERROR" && (
+                                    <div role="alert">
+                                        <p>{explanationState.message}</p>
+                                        <button type="button" onClick={handleExplain}>다시 시도</button>
+                                    </div>
+                                )}
+                                {explanationState.status === "SUCCESS" && (
+                                    <div className="ai-explanation-text">
+                                        <p>{explanationState.data.explanation.summary}</p>
+                                        <p>{explanationState.data.explanation.comparison}</p>
+                                        <p>{explanationState.data.explanation.pvExplanation}</p>
+                                        <small>{explanationState.data.explanation.limitation}</small>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </section>
+                )}
 
                 <div
                     className={`position-panel ${
@@ -651,6 +806,7 @@ function AiPlayPage() {
                             )}
                         </div>
                     )}
+                </div>
                 </div>
             </div>
         </div>

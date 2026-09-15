@@ -94,6 +94,59 @@
     gap: 32px;
 }
 
+.ai-explanation-panel {
+    align-self: flex-start;
+    width: 100%;
+    padding: 16px;
+    box-sizing: border-box;
+    border: 1px solid #ddd4c8;
+    border-radius: 12px;
+    background: #fffdf8;
+}
+
+.ai-play-side-panels {
+    display: grid;
+    width: 300px;
+    gap: 16px;
+}
+
+.ai-explanation-button {
+    width: 100%;
+    padding: 10px 14px;
+    border: 0;
+    border-radius: 8px;
+    background: #6d4c36;
+    color: white;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.ai-explanation-content,
+.ai-explanation-text {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.ai-candidate-list {
+    display: grid;
+    gap: 8px;
+}
+
+.ai-candidate-card {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 10px;
+    padding: 10px;
+    border-radius: 8px;
+    background: #f5eee5;
+}
+
+.ai-candidate-card strong,
+.ai-candidate-card small {
+    grid-column: 1 / -1;
+}
+
 .ai-play-board-area {
     width: fit-content;
 }
@@ -105,7 +158,7 @@
 /* 형세 */
 
 .position-panel {
-    width: 300px;
+    width: 100%;
 
     padding: 24px;
 

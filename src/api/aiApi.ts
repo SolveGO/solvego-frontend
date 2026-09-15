@@ -27,6 +27,32 @@ export type AiGameNextMoveResponse = {
     gameEnded: boolean;
     result: GameResult | null;
     endReason: GameEndReason | null;
+    candidates?: AiCandidate[];
+    evidenceToken?: string;
+};
+
+export type AiCandidate = {
+    id: string;
+    rank: number;
+    moveType: MoveType;
+    move: Position | null;
+    winRate: number;
+    scoreLead: number;
+    visits: number;
+    pv: Array<Position | null>;
+};
+
+export type AiExplanation = {
+    source: "LLM" | "TEMPLATE";
+    perspective: StoneColor;
+    candidates: AiCandidate[];
+    explanation: {
+        summary: string;
+        comparison: string;
+        pvExplanation: string;
+        limitation: string;
+        evidenceRefs: string[];
+    };
 };
 
 export class AiApiError extends Error {
@@ -55,5 +81,17 @@ export async function requestAiNextMove(
         throw new AiApiError(response.status);
     }
 
+    return response.json();
+}
+
+export async function requestAiExplanation(
+    evidenceToken: string,
+): Promise<AiExplanation> {
+    const response = await authFetch("/api/ai/game/explanation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ evidenceToken }),
+    });
+    if (!response.ok) throw new AiApiError(response.status);
     return response.json();
 }

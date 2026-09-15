@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AiApiError, requestAiNextMove, type GameMove } from "./aiApi";
+import { AiApiError, requestAiExplanation, requestAiNextMove, type GameMove } from "./aiApi";
 
 import { authFetch } from "./api";
 
@@ -173,5 +173,27 @@ describe("requestAiNextMove", () => {
 
             expect((error as AiApiError).status).toBe(504);
         }
+    });
+});
+
+describe("requestAiExplanation", () => {
+    it("서명된 evidence token만 해설 endpoint에 전송한다", async () => {
+        const responseData = {
+            source: "TEMPLATE", perspective: "BLACK", candidates: [],
+            explanation: {
+                summary: "요약", comparison: "비교", pvExplanation: "진행",
+                limitation: "한계", evidenceRefs: ["c1"],
+            },
+        };
+        vi.mocked(authFetch).mockResolvedValue({
+            ok: true, status: 200, json: async () => responseData,
+        } as Response);
+
+        await expect(requestAiExplanation("signed-token")).resolves.toEqual(responseData);
+        expect(authFetch).toHaveBeenCalledWith("/api/ai/game/explanation", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ evidenceToken: "signed-token" }),
+        });
     });
 });

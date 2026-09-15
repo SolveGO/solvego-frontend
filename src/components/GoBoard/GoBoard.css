@@ -24,6 +24,27 @@
     cursor: pointer;
 }
 
+.candidate-marker {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 5;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    background: #e0712b;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    box-shadow: 0 1px 4px rgb(0 0 0 / 35%);
+}
+
 .go-point::before {
     content: "";
 
