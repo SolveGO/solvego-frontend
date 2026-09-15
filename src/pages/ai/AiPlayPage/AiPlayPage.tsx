@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import GoBoard from "../../../components/GoBoard/GoBoard";
 
 import {
     AiApiError,
     requestAiNextMove,
+    type AiGameNextMoveResponse,
     type GameEndReason,
     type GameMove,
     type GameResult,
@@ -22,6 +23,71 @@ type WinRatePoint = {
 };
 
 type FrontGameEndReason = GameEndReason | "PLAYER_RESIGN";
+
+type AiTurn = {
+    blackStones: Position[];
+    whiteStones: Position[];
+    moves: GameMove[];
+    aiColor: StoneColor;
+    consecutivePasses: number;
+};
+
+type GamePhase =
+    | { status: "READY" | "PLAYER_TURN" | "ENDED" }
+    | { status: "AI_THINKING"; turn: AiTurn }
+    | { status: "AI_FAILED"; turn: AiTurn; message: string };
+
+// JSON 응답은 TypeScript 타입만으로 보장되지 않는다.
+function isValidAiResponse(
+    value: unknown,
+    turn: AiTurn,
+): value is AiGameNextMoveResponse {
+    if (!value || typeof value !== "object") {
+        return false;
+    }
+    const data = value as AiGameNextMoveResponse;
+    if (
+        !Number.isFinite(data.winRate) ||
+        data.winRate < 0 || data.winRate > 1 ||
+        !Number.isFinite(data.scoreLead) ||
+        typeof data.gameEnded !== "boolean"
+    ) {
+        return false;
+    }
+
+    if (data.gameEnded) {
+        if (data.endReason === "AI_RESIGN") {
+            return (
+                data.moveType === null && data.move === null &&
+                data.result === "PLAYER_WIN"
+            );
+        }
+        const expectedResult = data.scoreLead > 0
+            ? "AI_WIN"
+            : data.scoreLead < 0 ? "PLAYER_WIN" : "DRAW";
+        return (
+            data.endReason === "DOUBLE_PASS" &&
+            data.moveType === "PASS" && data.move === null &&
+            data.result === expectedResult &&
+            turn.consecutivePasses === 1 &&
+            turn.moves.at(-1)?.moveType === "PASS"
+        );
+    }
+
+    if (data.result !== null || data.endReason !== null) {
+        return false;
+    }
+    if (data.moveType === "PASS") {
+        return data.move === null && turn.consecutivePasses === 0;
+    }
+    const move = data.move;
+    return (
+        data.moveType === "PLAY" &&
+        move !== null && typeof move === "object" &&
+        Number.isInteger(move.x) && Number.isInteger(move.y) &&
+        move.x >= 0 && move.x < 19 && move.y >= 0 && move.y < 19
+    );
+}
 
 function WinRateChart({ history }: { history: WinRatePoint[] }) {
     const width = 260;
@@ -98,9 +164,14 @@ function AiPlayPage() {
 
     const [playerColor, setPlayerColor] = useState<StoneColor>("BLACK");
 
-    const [isAiThinking, setIsAiThinking] = useState(false);
-
-    const [isGameStarted, setIsGameStarted] = useState(false);
+    const [phase, setPhase] = useState<GamePhase>({ status: "READY" });
+    // React의 다음 렌더 전에도 중복 요청을 차단한다.
+    const requestInFlight = useRef(false);
+    const isAiThinking = phase.status === "AI_THINKING";
+    const isGameOver = phase.status === "ENDED";
+    const isGameStarted = phase.status !== "READY" && !isGameOver;
+    const canPlay = phase.status === "PLAYER_TURN";
+    const canSelectBoard = phase.status === "READY" || canPlay;
 
     const [isPositionOpen, setIsPositionOpen] = useState(true);
 
@@ -111,8 +182,6 @@ function AiPlayPage() {
     const [moves, setMoves] = useState<GameMove[]>([]);
 
     const [consecutivePasses, setConsecutivePasses] = useState(0);
-
-    const [isGameOver, setIsGameOver] = useState(false);
 
     const [gameResult, setGameResult] = useState<GameResult | null>(null);
 
@@ -182,7 +251,7 @@ function AiPlayPage() {
 
         setConsecutivePasses(0);
 
-        setIsGameOver(false);
+        setPhase({ status: "READY" });
 
         setGameResult(null);
         setGameEndReason(null);
@@ -211,159 +280,76 @@ function AiPlayPage() {
         aiColor: StoneColor,
         currentConsecutivePasses: number,
     ) {
-        setIsAiThinking(true);
+        if (requestInFlight.current) return;
+        requestInFlight.current = true;
+        const turn: AiTurn = {
+            blackStones: currentBlackStones,
+            whiteStones: currentWhiteStones,
+            moves: currentMoves,
+            aiColor,
+            consecutivePasses: currentConsecutivePasses,
+        };
+        setPhase({ status: "AI_THINKING", turn });
 
         try {
-            const data = await requestAiNextMove(currentMoves);
-
-            /*
-             * 백엔드의 winRate는 AI 기준.
-             * 화면에서는 항상 사용자 기준으로 변환한다.
-             */
-            updateWinRate(data.winRate);
-
-            setLastAiScoreLead(data.scoreLead);
-
-            /*
-             * 대국 종료
-             */
-            if (data.gameEnded) {
-                /*
-                 * AI가 두 번째 PASS를 한 경우
-                 * AI의 PASS도 수순에 추가한다.
-                 */
-                if (
-                    data.endReason === "DOUBLE_PASS" &&
-                    data.moveType === "PASS"
-                ) {
-                    const nextMoves: GameMove[] = [
-                        ...currentMoves,
-                        {
-                            player: aiColor,
-                            moveType: "PASS",
-                            position: null,
-                        },
-                    ];
-
-                    setMoves(nextMoves);
-
-                    setLastMovePosition(null);
-
-                    setConsecutivePasses(currentConsecutivePasses + 1);
-                }
-
-                setGameResult(data.result);
-                setGameEndReason(data.endReason);
-
-                setIsGameOver(true);
-                setIsGameStarted(false);
-
-                return;
+            const data = await requestAiNextMove(turn.moves);
+            if (!isValidAiResponse(data, turn)) {
+                throw new Error("AI가 올바르지 않은 응답을 반환했습니다.");
             }
 
-            /*
-             * AI PASS
-             */
-            if (data.moveType === "PASS") {
-                const nextMoves: GameMove[] = [
-                    ...currentMoves,
-                    {
-                        player: aiColor,
-                        moveType: "PASS",
-                        position: null,
-                    },
-                ];
-
-                setMoves(nextMoves);
-
-                setLastMovePosition(null);
-
-                setConsecutivePasses(currentConsecutivePasses + 1);
-
-                return;
+            // 상태를 변경하기 전에 착수 결과까지 계산한다.
+            const board = data.moveType === "PLAY"
+                ? playMove(
+                    turn.blackStones, turn.whiteStones, data.move!, turn.aiColor,
+                )
+                : { blackStones: turn.blackStones, whiteStones: turn.whiteStones };
+            if (board === null) {
+                throw new Error("AI가 유효하지 않은 수를 반환했습니다.");
             }
-
-            /*
-             * 종료되지 않은 정상 응답은
-             * PLAY여야 한다.
-             */
-            if (data.moveType !== "PLAY") {
-                alert("AI가 올바르지 않은 응답을 반환했습니다.");
-
-                return;
-            }
-
-            /*
-             * PLAY인데 좌표가 없으면
-             * 잘못된 응답이다.
-             */
-            if (data.move === null) {
-                alert("AI가 착수 좌표를 반환하지 않았습니다.");
-
-                return;
-            }
-
-            /*
-             * AI 착수
-             */
-            const aiMoveResult = playMove(
-                currentBlackStones,
-                currentWhiteStones,
-                data.move,
-                aiColor,
-            );
-
-            if (aiMoveResult === null) {
-                alert("AI가 유효하지 않은 수를 반환했습니다.");
-
-                return;
-            }
-
-            const nextMoves: GameMove[] = [
-                ...currentMoves,
-                {
-                    player: aiColor,
-                    moveType: "PLAY",
-                    position: data.move,
-                },
+            const nextMoves: GameMove[] = data.moveType === null ? turn.moves : [
+                ...turn.moves,
+                { player: turn.aiColor, moveType: data.moveType, position: data.move },
             ];
 
-            setBlackStones(aiMoveResult.blackStones);
-
-            setWhiteStones(aiMoveResult.whiteStones);
-
-            setLastMovePosition(data.move);
-
+            setBlackStones(board.blackStones);
+            setWhiteStones(board.whiteStones);
             setMoves(nextMoves);
-
-            /*
-             * 실제 착수가 발생하면
-             * 연속 PASS는 끊긴다.
-             */
-            setConsecutivePasses(0);
-        } catch (error) {
-            if (error instanceof AiApiError) {
-                if (error.status === 502) {
-                    alert("AI 서버에 연결할 수 없습니다.");
-
-                    return;
-                }
-
-                if (error.status === 504) {
-                    alert("AI 응답 시간이 초과되었습니다.");
-
-                    return;
-                }
+            if (data.moveType !== null) {
+                setLastMovePosition(data.move);
             }
-
-            alert("AI의 수를 가져오지 못했습니다.");
+            setConsecutivePasses(
+                data.moveType === "PASS" ? turn.consecutivePasses + 1 : 0,
+            );
+            updateWinRate(data.winRate);
+            setLastAiScoreLead(data.scoreLead);
+            setGameResult(data.result);
+            setGameEndReason(data.endReason);
+            setPhase({ status: data.gameEnded ? "ENDED" : "PLAYER_TURN" });
+        } catch (error) {
+            let message = "AI의 수를 가져오지 못했습니다.";
+            if (error instanceof AiApiError && error.status === 502) {
+                message = "AI 서버에 연결할 수 없습니다.";
+            } else if (error instanceof AiApiError && error.status === 504) {
+                message = "AI 응답 시간이 초과되었습니다.";
+            }
+            setPhase({ status: "AI_FAILED", turn, message });
         } finally {
-            setIsAiThinking(false);
+            // 요청 종료는 사용자 차례로의 전환을 의미하지 않는다.
+            requestInFlight.current = false;
         }
     }
 
+    async function handleRetry() {
+        if (phase.status !== "AI_FAILED" || requestInFlight.current) return;
+        const turn = phase.turn;
+        await requestAiMove(
+            turn.blackStones, turn.whiteStones, turn.moves,
+            turn.aiColor, turn.consecutivePasses,
+        );
+    }
+
     async function handleBoardSelect(position: Position) {
-        if (isAiThinking || isGameOver) {
+        if (!canSelectBoard || requestInFlight.current) {
             return;
         }
 
@@ -389,7 +375,7 @@ function AiPlayPage() {
             resetBoard();
 
             setPlayerColor("BLACK");
-            setIsGameStarted(true);
+            setPhase({ status: "PLAYER_TURN" });
         }
 
         /*
@@ -441,7 +427,7 @@ function AiPlayPage() {
     }
 
     async function handlePass() {
-        if (isAiThinking || isGameOver || !isGameStarted) {
+        if (!canPlay || requestInFlight.current) {
             return;
         }
 
@@ -476,8 +462,7 @@ function AiPlayPage() {
 
             setGameEndReason("DOUBLE_PASS");
 
-            setIsGameOver(true);
-            setIsGameStarted(false);
+            setPhase({ status: "ENDED" });
 
             return;
         }
@@ -494,7 +479,7 @@ function AiPlayPage() {
     }
 
     function handleResign() {
-        if (isAiThinking || isGameOver || !isGameStarted) {
+        if ((!canPlay && phase.status !== "AI_FAILED") || requestInFlight.current) {
             return;
         }
 
@@ -502,12 +487,11 @@ function AiPlayPage() {
 
         setGameEndReason("PLAYER_RESIGN");
 
-        setIsGameOver(true);
-        setIsGameStarted(false);
+        setPhase({ status: "ENDED" });
     }
 
     async function handleStartGame(color: StoneColor) {
-        if (isAiThinking) {
+        if (requestInFlight.current) {
             return;
         }
 
@@ -515,7 +499,7 @@ function AiPlayPage() {
 
         resetBoard();
 
-        setIsGameStarted(true);
+        setPhase({ status: "PLAYER_TURN" });
 
         /*
          * 사용자가 흑이면
@@ -567,7 +551,7 @@ function AiPlayPage() {
                             <button
                                 className="ai-play-pass-button"
                                 onClick={handlePass}
-                                disabled={isAiThinking || isGameOver}>
+                                disabled={!canPlay}>
                                 PASS
                             </button>
 
@@ -581,10 +565,19 @@ function AiPlayPage() {
                 </div>
             </div>
 
+            {phase.status === "AI_FAILED" && (
+                <div role="alert">
+                    <p>
+                        {phase.message} AI 차례입니다. 다시 시도해주세요.
+                    </p>
+                    <button onClick={handleRetry}>AI 요청 재시도</button>
+                </div>
+            )}
+
             <div className="ai-play-content">
                 <div
                     className={
-                        isAiThinking || isGameOver
+                        !canSelectBoard
                             ? "ai-play-board-area disabled"
                             : "ai-play-board-area"
                     }>
@@ -626,7 +619,9 @@ function AiPlayPage() {
                                 <p className="position-empty">
                                     {isAiThinking
                                         ? "AI가 생각하고 있습니다."
-                                        : isGameStarted
+                                        : phase.status === "AI_FAILED"
+                                          ? "AI 응답을 기다리고 있습니다."
+                                          : isGameStarted
                                           ? "첫 수를 두어주세요."
                                           : "바둑판을 클릭하면 흑으로 바로 시작할 수 있습니다."}
                                 </p>

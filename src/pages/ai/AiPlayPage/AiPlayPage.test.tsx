@@ -1,10 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import AiPlayPage from "./AiPlayPage";
 
-import { requestAiNextMove } from "../../../api/aiApi";
+import { AiApiError, requestAiNextMove, type AiGameNextMoveResponse } from "../../../api/aiApi";
 
 import { playMove } from "../../../utils/goRules";
 
@@ -17,10 +17,14 @@ import { playMove } from "../../../utils/goRules";
  */
 vi.mock("../../../components/GoBoard/GoBoard", () => ({
     default: ({
-        onSelect,
+        onSelect, blackStones, whiteStones,
     }: {
+        blackStones: { x: number; y: number }[];
+        whiteStones: { x: number; y: number }[];
         onSelect: (position: { x: number; y: number }) => void;
     }) => (
+        <>
+        <output data-testid="board">{JSON.stringify({ blackStones, whiteStones })}</output>
         <button
             type="button"
             onClick={() =>
@@ -31,6 +35,7 @@ vi.mock("../../../components/GoBoard/GoBoard", () => ({
             }>
             바둑판 클릭
         </button>
+        </>
     ),
 }));
 
@@ -61,7 +66,7 @@ vi.mock("../../../utils/goRules", () => ({
 
 describe("AiPlayPage", () => {
     beforeEach(() => {
-        vi.clearAllMocks();
+        vi.resetAllMocks();
 
         vi.mocked(playMove).mockImplementation(
             (blackStones, whiteStones, position, color) => {
@@ -446,5 +451,161 @@ describe("AiPlayPage", () => {
          * AI API를 다시 호출하면 안 된다.
          */
         expect(requestAiNextMove).toHaveBeenCalledTimes(1);
+    });
+});
+
+
+const validMove: AiGameNextMoveResponse = {
+    moveType: "PLAY", move: { x: 15, y: 15 },
+    winRate: 0.4, scoreLead: -3,
+    gameEnded: false, result: null, endReason: null,
+};
+const click = (name: string) => fireEvent.click(screen.getByRole("button", { name }));
+const boardText = () => screen.getByTestId("board").textContent;
+
+describe("AI 실패 복구", () => {
+    beforeEach(() => {
+        vi.resetAllMocks();
+        vi.mocked(playMove).mockImplementation((blackStones, whiteStones, position, color) => ({
+            blackStones: color === "BLACK" ? [...blackStones, position] : blackStones,
+            whiteStones: color === "WHITE" ? [...whiteStones, position] : whiteStones,
+        }));
+    });
+
+    it.each([
+        ["착수", new AiApiError(502)],
+        ["PASS", new AiApiError(504)],
+        ["백 시작", new TypeError("Failed to fetch")],
+    ])("%s 실패 시 차례를 유지하고 동일 수순으로 재시도한다", async (scenario, error) => {
+        vi.mocked(requestAiNextMove).mockRejectedValueOnce(error).mockRejectedValueOnce(error);
+        render(<AiPlayPage />);
+        if (scenario === "백 시작") click("백으로 시작");
+        else if (scenario === "PASS") { click("흑으로 시작"); click("PASS"); }
+        else click("바둑판 클릭");
+        await screen.findByRole("alert");
+        const originalBoard = boardText();
+        const originalMoves = structuredClone(vi.mocked(requestAiNextMove).mock.calls[0][0]);
+        expect(originalMoves).toEqual(scenario === "백 시작" ? [] : [{
+            player: "BLACK", moveType: scenario === "PASS" ? "PASS" : "PLAY",
+            position: scenario === "PASS" ? null : { x: 3, y: 3 },
+        }]);
+        expect(screen.getByRole("button", { name: "PASS" })).toBeDisabled();
+        click("바둑판 클릭"); click("PASS");
+        expect(requestAiNextMove).toHaveBeenCalledTimes(1);
+        expect(boardText()).toBe(originalBoard);
+        expect(screen.queryByText("대국 종료")).not.toBeInTheDocument();
+
+        click("AI 요청 재시도");
+        await screen.findByRole("alert");
+        expect(requestAiNextMove).toHaveBeenNthCalledWith(2, originalMoves);
+        expect(boardText()).toBe(originalBoard);
+        expect(screen.getByRole("button", { name: "PASS" })).toBeDisabled();
+
+        let resolve!: (value: AiGameNextMoveResponse) => void;
+        vi.mocked(requestAiNextMove).mockReturnValueOnce(new Promise(r => { resolve = r; }));
+        const retry = screen.getByRole("button", { name: "AI 요청 재시도" });
+        act(() => { fireEvent.click(retry); fireEvent.click(retry); });
+        click("바둑판 클릭"); click("PASS");
+        expect(requestAiNextMove).toHaveBeenCalledTimes(3);
+        expect(requestAiNextMove).toHaveBeenNthCalledWith(3, originalMoves);
+        await act(async () => resolve(validMove));
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "PASS" })).toBeEnabled();
+        expect(screen.getByRole("img").querySelectorAll("circle")).toHaveLength(1);
+        const board = JSON.parse(boardText()!);
+        expect(board[scenario === "백 시작" ? "blackStones" : "whiteStones"]).toEqual([validMove.move]);
+
+        vi.mocked(requestAiNextMove).mockResolvedValueOnce(validMove);
+        click("PASS");
+        await waitFor(() => expect(requestAiNextMove).toHaveBeenCalledTimes(4));
+        expect(vi.mocked(requestAiNextMove).mock.calls[3][0]).toEqual([
+            ...originalMoves,
+            { player: scenario === "백 시작" ? "BLACK" : "WHITE", moveType: "PLAY", position: validMove.move },
+            { player: scenario === "백 시작" ? "WHITE" : "BLACK", moveType: "PASS", position: null },
+        ]);
+    });
+
+    it.each([
+        ["null", null],
+        ["누락된 필드", {}],
+        ["좌표 없음", { ...validMove, move: null }],
+        ["좌표 범위 초과", { ...validMove, move: { x: 19, y: 0 } }],
+        ["소수 좌표", { ...validMove, move: { x: 0.5, y: 0 } }],
+        ["승률 범위 초과", { ...validMove, winRate: 2 }],
+        ["집 차이 NaN", { ...validMove, scoreLead: NaN }],
+        ["알 수 없는 수", { ...validMove, moveType: "INVALID" }],
+        ["PASS에 좌표 존재", { ...validMove, moveType: "PASS" }],
+        ["잘못된 종료 결과", { ...validMove, gameEnded: true }],
+        ["집 차이와 모순된 종료 결과", { ...validMove, gameEnded: true, moveType: "PASS", move: null, endReason: "DOUBLE_PASS", result: "AI_WIN" }],
+    ])("잘못된 응답(%s)은 기존 바둑판과 평가를 변경하지 않는다", async (_name, response) => {
+        vi.mocked(requestAiNextMove).mockResolvedValueOnce(validMove)
+            .mockResolvedValueOnce(response as AiGameNextMoveResponse);
+        render(<AiPlayPage />);
+        click("바둑판 클릭");
+        await screen.findByText("60.0%");
+        const originalBoard = boardText();
+        click("PASS");
+        await screen.findByRole("alert");
+        const failedMoves = structuredClone(vi.mocked(requestAiNextMove).mock.calls[1][0]);
+        expect(boardText()).toBe(originalBoard);
+        expect(screen.getByText("60.0%")).toBeInTheDocument();
+        expect(screen.getByRole("img").querySelectorAll("circle")).toHaveLength(1);
+        expect(screen.queryByText("대국 종료")).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "PASS" })).toBeDisabled();
+        vi.mocked(requestAiNextMove).mockResolvedValueOnce(validMove);
+        click("AI 요청 재시도");
+        await waitFor(() => expect(screen.getByRole("button", { name: "PASS" })).toBeEnabled());
+        expect(requestAiNextMove).toHaveBeenNthCalledWith(3, failedMoves);
+        expect(screen.getByRole("img").querySelectorAll("circle")).toHaveLength(2);
+    });
+
+    it("선행 PASS 없이 DOUBLE_PASS를 반환하면 종료하지 않는다", async () => {
+        vi.mocked(requestAiNextMove).mockResolvedValueOnce({
+            ...validMove, moveType: "PASS", move: null, gameEnded: true,
+            endReason: "DOUBLE_PASS", result: "PLAYER_WIN",
+        });
+        render(<AiPlayPage />);
+        click("바둑판 클릭");
+        await screen.findByRole("alert");
+        expect(screen.queryByText("대국 종료")).not.toBeInTheDocument();
+        expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    });
+
+    it("착수 불가능한 AI 수는 평가까지 반영하지 않는다", async () => {
+        vi.mocked(requestAiNextMove).mockResolvedValue(validMove);
+        vi.mocked(playMove).mockReturnValueOnce({ blackStones: [{ x: 3, y: 3 }], whiteStones: [] })
+            .mockReturnValueOnce(null);
+        render(<AiPlayPage />);
+        click("바둑판 클릭");
+        await screen.findByRole("alert");
+        expect(JSON.parse(boardText()!)).toEqual({ blackStones: [{ x: 3, y: 3 }], whiteStones: [] });
+        expect(screen.queryByRole("img")).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "PASS" })).toBeDisabled();
+    });
+
+    it("PASS 재시도 후 AI PASS로 정상 종료한다", async () => {
+        vi.mocked(requestAiNextMove).mockRejectedValueOnce(new AiApiError(504)).mockResolvedValueOnce({
+            ...validMove, moveType: "PASS", move: null, gameEnded: true,
+            endReason: "DOUBLE_PASS", result: "PLAYER_WIN",
+        });
+        render(<AiPlayPage />);
+        click("흑으로 시작"); click("PASS");
+        await screen.findByRole("alert");
+        click("AI 요청 재시도");
+        await screen.findByText("승리했습니다.");
+        expect(requestAiNextMove).toHaveBeenCalledTimes(2);
+        expect(vi.mocked(requestAiNextMove).mock.calls[1][0]).toHaveLength(1);
+    });
+
+    it("실패 후 기권하고 새 대국을 시작하면 실패 문맥을 제거한다", async () => {
+        vi.mocked(requestAiNextMove).mockRejectedValueOnce(new AiApiError(502)).mockResolvedValueOnce(validMove);
+        render(<AiPlayPage />);
+        click("바둑판 클릭");
+        await screen.findByRole("alert");
+        click("기권");
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+        click("백으로 시작");
+        await screen.findByText("60.0%");
+        expect(requestAiNextMove).toHaveBeenNthCalledWith(2, []);
     });
 });
