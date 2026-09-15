@@ -230,6 +230,7 @@ describe("AiPlayPage", () => {
             { position: { x: 3, y: 15 }, label: "B" },
         ]);
         await screen.findByText("A 후보가 가장 높은 평가를 받았습니다.");
+        expect(screen.queryByText("가능한 예상 진행입니다.")).not.toBeInTheDocument();
         fireEvent.click(explainButton);
         expect(requestAiExplanation).toHaveBeenCalledTimes(1);
         expect(requestAiExplanation).toHaveBeenCalledWith("signed-evidence");
@@ -275,14 +276,16 @@ describe("AiPlayPage", () => {
         vi.mocked(requestAiExplanation).mockResolvedValue({
             source: "TEMPLATE", perspective: "WHITE", candidates: [],
             explanation: {
-                summary: "요약", comparison: "비교", pvExplanation: "진행",
-                limitation: "한계", evidenceRefs: ["c1"],
+                summary: "이번 수의 AI 해설을 불러오지 못했습니다.",
+                comparison: "", pvExplanation: "",
+                limitation: "잠시 후 다시 시도해주세요.", evidenceRefs: ["c1"],
             },
         });
         render(<AiPlayPage />);
         fireEvent.click(screen.getByRole("button", { name: "바둑판 클릭" }));
         fireEvent.click(await screen.findByRole("button", { name: "왜 이 수?" }));
-        await screen.findByText("요약");
+        await screen.findByText("이번 수의 AI 해설을 불러오지 못했습니다.");
+        expect(screen.getByRole("button", { name: "다시 시도" })).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "기권" }));
         fireEvent.click(screen.getByRole("button", { name: "흑으로 시작" }));
 

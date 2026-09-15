@@ -338,7 +338,13 @@ function AiPlayPage() {
             const data = await requestAiExplanation(token);
             setExplanationState((current) =>
                 lastEvidenceToken === token && current.status === "LOADING"
-                    ? { status: "SUCCESS", token, data }
+                    ? data.source === "TEMPLATE"
+                        ? {
+                            status: "ERROR",
+                            token,
+                            message: data.explanation.summary,
+                        }
+                        : { status: "SUCCESS", token, data }
                     : current,
             );
         } catch {
@@ -750,8 +756,9 @@ function AiPlayPage() {
                                 {explanationState.status === "SUCCESS" && (
                                     <div className="ai-explanation-text">
                                         <p>{explanationState.data.explanation.summary}</p>
-                                        <p>{explanationState.data.explanation.comparison}</p>
-                                        <p>{explanationState.data.explanation.pvExplanation}</p>
+                                        {explanationState.data.explanation.comparison && (
+                                            <p>{explanationState.data.explanation.comparison}</p>
+                                        )}
                                         <small>{explanationState.data.explanation.limitation}</small>
                                     </div>
                                 )}
