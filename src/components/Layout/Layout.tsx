@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { useContext } from "react";
+import { useContext, useState } from "react";
 
 import AuthContext from "../../contexts/AuthContext";
 
@@ -9,9 +9,21 @@ function Layout() {
     const navigate = useNavigate();
     const { isLoggedIn, logout } = useContext(AuthContext);
 
-    function handleLogout() {
-        logout();
-        navigate("/");
+    const [logoutError, setLogoutError] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+    async function handleLogout() {
+        if (isLoggingOut) return;
+        setIsLoggingOut(true);
+        try {
+            await logout();
+            setLogoutError(false);
+            navigate("/");
+        } catch {
+            setLogoutError(true);
+        } finally {
+            setIsLoggingOut(false);
+        }
     }
 
     function navClassName({ isActive }: { isActive: boolean }) {
@@ -49,13 +61,17 @@ function Layout() {
                 </nav>
 
                 <div className="sidebar-account">
+                    {logoutError && <div role="alert">
+                        <p>서버 로그아웃에 실패했습니다.</p>
+                        <button disabled={isLoggingOut} onClick={handleLogout}>로그아웃 재시도</button>
+                    </div>}
                     {isLoggedIn ? (
                         <>
                             <NavLink to="/mypage" className={navClassName}>
                                 마이페이지
                             </NavLink>
 
-                            <button onClick={handleLogout}>로그아웃</button>
+                            <button disabled={isLoggingOut} onClick={handleLogout}>로그아웃</button>
                         </>
                     ) : (
                         <>

@@ -1,34 +1,34 @@
-import { createContext, useState } from "react";
+import { createContext, useEffect, useSyncExternalStore } from "react";
+import { getAuthState, subscribeAuth, type AuthStatus } from "../api/authSession";
+import { loginSession, logoutSession, restoreSession } from "../api/api";
 
 type AuthContextType = {
     isLoggedIn: boolean;
-    login: (accessToken: string) => void;
-    logout: () => void;
+    status: AuthStatus;
+    login: typeof loginSession;
+    logout: typeof logoutSession;
+    retryAuth: typeof restoreSession;
 };
 
 const AuthContext = createContext<AuthContextType>({
     isLoggedIn: false,
-    login: () => {},
-    logout: () => {},
+    status: "CHECKING",
+    login: loginSession,
+    logout: logoutSession,
+    retryAuth: restoreSession,
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const [isLoggedIn, setIsLoggedIn] = useState(
-        localStorage.getItem("accessToken") !== null,
-    );
-
-    function login(accessToken: string) {
-        localStorage.setItem("accessToken", accessToken);
-        setIsLoggedIn(true);
-    }
-
-    function logout() {
-        localStorage.removeItem("accessToken");
-        setIsLoggedIn(false);
-    }
-
+    const auth = useSyncExternalStore(subscribeAuth, getAuthState);
+    useEffect(() => { void restoreSession(); }, []);
     return (
-        <AuthContext.Provider value={{ isLoggedIn, login, logout }}>
+        <AuthContext.Provider value={{
+            isLoggedIn: auth.status === "AUTHENTICATED",
+            status: auth.status,
+            login: loginSession,
+            logout: logoutSession,
+            retryAuth: restoreSession,
+        }}>
             {children}
         </AuthContext.Provider>
     );

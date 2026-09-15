@@ -1,9 +1,8 @@
-import { useContext, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import GoBoard from "../../../components/GoBoard/GoBoard";
 import { authFetch } from "../../../api/api";
-import AuthContext from "../../../contexts/AuthContext";
 import { playMove } from "../../../utils/goRules";
 
 import "./ProblemCreatePage.css";
@@ -30,7 +29,6 @@ type AiRecommendResponse = {
 
 function ProblemCreatePage() {
     const navigate = useNavigate();
-    const { logout } = useContext(AuthContext);
 
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
@@ -191,11 +189,7 @@ function ProblemCreatePage() {
 
         if (!response.ok) {
             if (response.status === 401) {
-                logout();
-
-                alert("로그인이 만료되었습니다.");
-
-                navigate("/login");
+                alert("인증 요청이 거부되었습니다. 다시 로그인해주세요.");
 
                 return;
             }

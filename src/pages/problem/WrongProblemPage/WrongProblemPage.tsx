@@ -1,7 +1,6 @@
-import { useContext, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { authFetch } from "../../../api/api";
-import AuthContext from "../../../contexts/AuthContext";
 import "./WrongProblemPage.css";
 
 type WrongProblem = {
@@ -10,9 +9,6 @@ type WrongProblem = {
 };
 
 function WrongProblemPage() {
-    const navigate = useNavigate();
-    const { logout } = useContext(AuthContext);
-
     const [problems, setProblems] = useState<WrongProblem[]>([]);
 
     useEffect(() => {
@@ -21,9 +17,8 @@ function WrongProblemPage() {
 
             if (!response.ok) {
                 if (response.status === 401) {
-                    logout();
-                    alert("로그인이 만료되었습니다.");
-                    navigate("/login");
+                    alert("인증 요청이 거부되었습니다. 다시 로그인해주세요.");
+
                     return;
                 }
 
@@ -37,7 +32,7 @@ function WrongProblemPage() {
         }
 
         fetchWrongProblems();
-    }, [logout, navigate]);
+    }, []);
 
     return (
         <div className="wrong-problem-page">

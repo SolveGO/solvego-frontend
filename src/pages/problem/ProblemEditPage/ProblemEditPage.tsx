@@ -1,9 +1,8 @@
-import { useContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import GoBoard from "../../../components/GoBoard/GoBoard";
 import { authFetch } from "../../../api/api";
-import AuthContext from "../../../contexts/AuthContext";
 import { playMove } from "../../../utils/goRules";
 
 import "./ProblemEditPage.css";
@@ -41,7 +40,6 @@ type AiRecommendResponse = {
 function ProblemEditPage() {
     const navigate = useNavigate();
     const { problemId } = useParams();
-    const { logout } = useContext(AuthContext);
 
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
@@ -71,9 +69,8 @@ function ProblemEditPage() {
 
             if (!response.ok) {
                 if (response.status === 401) {
-                    logout();
-                    alert("로그인이 만료되었습니다.");
-                    navigate("/login");
+                    alert("인증 요청이 거부되었습니다. 다시 로그인해주세요.");
+
                     return;
                 }
 
@@ -111,7 +108,7 @@ function ProblemEditPage() {
         }
 
         fetchProblemForEdit();
-    }, [problemId, navigate, logout]);
+    }, [problemId, navigate]);
 
     function isSamePosition(a: Position, b: Position) {
         return a.x === b.x && a.y === b.y;
@@ -248,11 +245,7 @@ function ProblemEditPage() {
 
         if (!response.ok) {
             if (response.status === 401) {
-                logout();
-
-                alert("로그인이 만료되었습니다.");
-
-                navigate("/login");
+                alert("인증 요청이 거부되었습니다. 다시 로그인해주세요.");
 
                 return;
             }

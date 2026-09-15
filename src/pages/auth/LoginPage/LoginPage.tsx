@@ -1,12 +1,7 @@
 import { useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AuthContext from "../../../contexts/AuthContext";
-import { API_BASE_URL } from "../../../api/api";
 import "../AuthPage.css";
-
-type LoginResponse = {
-    accessToken: string;
-};
 
 function LoginPage() {
     const [username, setUsername] = useState("");
@@ -15,27 +10,19 @@ function LoginPage() {
     const { login } = useContext(AuthContext);
     const navigate = useNavigate();
 
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
     async function handleLogin() {
-        const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                username,
-                password,
-            }),
-        });
-
-        if (!response.ok) {
-            alert("로그인에 실패했습니다.");
-            return;
+        if (isSubmitting) return;
+        setIsSubmitting(true);
+        try {
+            await login(username, password);
+            navigate("/");
+        } catch {
+            alert("로그인에 실패했습니다. 입력 정보와 연결 상태를 확인해주세요.");
+        } finally {
+            setIsSubmitting(false);
         }
-
-        const data: LoginResponse = await response.json();
-
-        login(data.accessToken);
-        navigate("/");
     }
 
     function handleSignup() {
@@ -68,7 +55,7 @@ function LoginPage() {
                         />
                     </div>
 
-                    <button className="auth-button" onClick={handleLogin}>
+                    <button className="auth-button" onClick={handleLogin} disabled={isSubmitting}>
                         로그인
                     </button>
 
