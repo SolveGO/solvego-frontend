@@ -245,6 +245,20 @@
     opacity: 0.9;
 }
 
+.mypage-password-form button:disabled,
+.mypage-danger button:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.mypage-message {
+    margin: 0 0 16px;
+
+    font-size: 14px;
+
+    color: var(--dusk-blue);
+}
+
 /* 회원 탈퇴 */
 
 .mypage-danger {
