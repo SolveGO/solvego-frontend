@@ -231,6 +231,7 @@ describe("AiPlayPage", () => {
         ]);
         await screen.findByText("A 후보가 가장 높은 평가를 받았습니다.");
         expect(screen.queryByText("가능한 예상 진행입니다.")).not.toBeInTheDocument();
+        expect(screen.queryByText("낮은 탐색량의 결과입니다.")).not.toBeInTheDocument();
         fireEvent.click(explainButton);
         expect(requestAiExplanation).toHaveBeenCalledTimes(1);
         expect(requestAiExplanation).toHaveBeenCalledWith("signed-evidence");

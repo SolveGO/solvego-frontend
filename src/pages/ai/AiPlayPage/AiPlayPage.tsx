@@ -759,7 +759,6 @@ function AiPlayPage() {
                                         {explanationState.data.explanation.comparison && (
                                             <p>{explanationState.data.explanation.comparison}</p>
                                         )}
-                                        <small>{explanationState.data.explanation.limitation}</small>
                                     </div>
                                 )}
                             </div>
