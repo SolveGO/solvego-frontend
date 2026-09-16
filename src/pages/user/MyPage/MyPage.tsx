@@ -8,6 +8,10 @@ import {
     requestPasswordChange,
     type MyPageData,
 } from "../../../api/userApi";
+import {
+    requestAiExplanationUsage,
+    type AiExplanationUsage,
+} from "../../../api/aiApi";
 
 import "./MyPage.css";
 
@@ -22,6 +26,10 @@ function MyPage() {
     const { logout } = useContext(AuthContext);
     const [data, setData] = useState<MyPageData | null>(null);
     const [loadError, setLoadError] = useState(false);
+    const [explanationUsage, setExplanationUsage] =
+        useState<AiExplanationUsage | null>(null);
+    const [usageLoadError, setUsageLoadError] = useState(false);
+    const [subscriptionMessage, setSubscriptionMessage] = useState("");
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
@@ -29,6 +37,7 @@ function MyPage() {
     const [passwordMessage, setPasswordMessage] = useState("");
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState(false);
+    const currentPlan = data?.plan ?? "FREE";
 
     useEffect(() => {
         let active = true;
@@ -38,6 +47,35 @@ function MyPage() {
             })
             .catch(() => {
                 if (active) setLoadError(true);
+            });
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!explanationUsage) return;
+
+        const resetDelay = new Date(explanationUsage.resetsAt).getTime() - Date.now();
+        if (!Number.isFinite(resetDelay) || resetDelay <= 0) return;
+
+        const timer = window.setTimeout(() => {
+            requestAiExplanationUsage()
+                .then(setExplanationUsage)
+                .catch(() => setUsageLoadError(true));
+        }, resetDelay + 1000);
+
+        return () => window.clearTimeout(timer);
+    }, [explanationUsage]);
+
+    useEffect(() => {
+        let active = true;
+        requestAiExplanationUsage()
+            .then((response) => {
+                if (active) setExplanationUsage(response);
+            })
+            .catch(() => {
+                if (active) setUsageLoadError(true);
             });
         return () => {
             active = false;
@@ -117,6 +155,63 @@ function MyPage() {
                                 <span>가입일</span>
                                 <strong>{formatJoinedAt(data.joinedAt)}</strong>
                             </div>
+                        </div>
+                    </section>
+
+                    <section className="mypage-section">
+                        <h2>AI 해설</h2>
+                        <div className="mypage-explanation-card">
+                            <div className="mypage-plan-row">
+                                <span>현재 플랜</span>
+                                <strong className={`mypage-plan-badge ${currentPlan.toLowerCase()}`}>
+                                    {currentPlan}
+                                </strong>
+                            </div>
+
+                            {explanationUsage && (
+                                <div className="mypage-explanation-stats">
+                                    <div>
+                                        <span>오늘 사용</span>
+                                        <strong>{explanationUsage.usedCount}회</strong>
+                                    </div>
+                                    <div>
+                                        <span>남은 횟수</span>
+                                        <strong>{explanationUsage.remainingCount}회</strong>
+                                    </div>
+                                    <div>
+                                        <span>일일 한도</span>
+                                        <strong>{explanationUsage.dailyLimit}회</strong>
+                                    </div>
+                                </div>
+                            )}
+
+                            {!explanationUsage && !usageLoadError && (
+                                <p role="status" className="mypage-message">
+                                    AI 해설 사용량을 불러오고 있습니다.
+                                </p>
+                            )}
+                            {usageLoadError && (
+                                <p role="alert" className="mypage-message">
+                                    AI 해설 사용량을 불러오지 못했습니다.
+                                </p>
+                            )}
+
+                            {currentPlan === "FREE" && (
+                                <div className="mypage-subscription-action">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSubscriptionMessage(
+                                            "구독 결제 기능은 준비 중입니다.",
+                                        )}>
+                                        구독하고 해설 한도 늘리기
+                                    </button>
+                                    {subscriptionMessage && (
+                                        <p role="status" className="mypage-message">
+                                            {subscriptionMessage}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </section>
 

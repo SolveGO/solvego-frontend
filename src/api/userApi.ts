@@ -11,6 +11,7 @@ export type MyPageData = {
     registeredProblemCount: number;
     solvedProblemCount: number;
     wrongProblemCount: number;
+    plan: "FREE" | "PRO";
     problems: MyPageProblem[];
 };
 

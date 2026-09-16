@@ -19,6 +19,7 @@ describe("userApi", () => {
             registeredProblemCount: 1,
             solvedProblemCount: 2,
             wrongProblemCount: 1,
+            plan: "FREE",
             problems: [],
         };
         vi.mocked(authFetch).mockResolvedValue(

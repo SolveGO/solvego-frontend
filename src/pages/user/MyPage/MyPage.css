@@ -62,6 +62,103 @@
     color: var(--ink-black);
 }
 
+/* AI 해설 */
+
+.mypage-explanation-card {
+    padding: 20px;
+
+    border: 1px solid var(--alabaster-grey);
+    border-radius: 10px;
+
+    background: var(--white);
+}
+
+.mypage-plan-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    margin-bottom: 18px;
+}
+
+.mypage-plan-row > span,
+.mypage-explanation-stats span {
+    font-size: 14px;
+
+    color: var(--dusk-blue);
+}
+
+.mypage-plan-badge {
+    padding: 5px 10px;
+
+    border-radius: 999px;
+
+    font-size: 13px;
+    letter-spacing: 0.04em;
+}
+
+.mypage-plan-badge.free {
+    color: var(--dusk-blue);
+    background: #eef1f5;
+}
+
+.mypage-plan-badge.pro {
+    color: #79510b;
+    background: #fff2c7;
+}
+
+.mypage-explanation-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.mypage-explanation-stats > div {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+
+    padding: 14px;
+
+    border-radius: 8px;
+
+    background: #f7f8fa;
+}
+
+.mypage-explanation-stats strong {
+    font-size: 20px;
+
+    color: var(--prussian-blue);
+}
+
+.mypage-subscription-action {
+    margin-top: 18px;
+}
+
+.mypage-subscription-action button {
+    padding: 9px 16px;
+
+    border: 1px solid var(--prussian-blue);
+    border-radius: 8px;
+
+    font: inherit;
+    font-weight: 600;
+
+    color: var(--prussian-blue);
+    background: var(--white);
+
+    cursor: pointer;
+}
+
+.mypage-subscription-action button:hover {
+    color: var(--white);
+    background: var(--prussian-blue);
+}
+
+.mypage-subscription-action .mypage-message {
+    margin: 10px 0 0;
+}
+
 /* 내 활동 */
 
 .mypage-stats {
