@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import AuthContext from "../../../contexts/AuthContext";
@@ -13,6 +13,8 @@ import {
     type AiExplanationUsage,
 } from "../../../api/aiApi";
 
+import { prepareCheckout, getCheckout, checkoutMessage, type Checkout } from "../../../api/subscriptionApi";
+import { startBillingAuth } from "../../../billing/tossBilling";
 import "./MyPage.css";
 
 function formatJoinedAt(joinedAt: string) {
@@ -29,6 +31,9 @@ function MyPage() {
     const [explanationUsage, setExplanationUsage] =
         useState<AiExplanationUsage | null>(null);
     const [usageLoadError, setUsageLoadError] = useState(false);
+    const [checkout, setCheckout] = useState<Checkout | null>(null);
+    const [billingBusy, setBillingBusy] = useState(false);
+    const billingLock = useRef(false);
     const [subscriptionMessage, setSubscriptionMessage] = useState("");
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
@@ -81,6 +86,48 @@ function MyPage() {
             active = false;
         };
     }, []);
+
+    async function handleSubscription() {
+        if (billingLock.current) return;
+        billingLock.current = true;
+        setBillingBusy(true);
+        setSubscriptionMessage("");
+        try {
+            const prepared = await prepareCheckout();
+            setCheckout(prepared);
+            if (prepared.status !== "READY") setSubscriptionMessage(checkoutMessage(prepared.status));
+            if (prepared.status === "SUCCEEDED") {
+                setData(await requestMyPage());
+                setExplanationUsage(await requestAiExplanationUsage());
+            }
+        } catch { setSubscriptionMessage("구독 결제를 준비하지 못했습니다. 결제 설정 또는 연결 상태를 확인해주세요."); }
+        finally { billingLock.current = false; setBillingBusy(false); }
+    }
+
+    async function confirmSubscription() {
+        if (!checkout || billingLock.current || checkout.status !== "READY") return;
+        billingLock.current = true;
+        setBillingBusy(true);
+        try { await startBillingAuth(checkout); }
+        catch { setSubscriptionMessage("결제수단 인증이 취소되었거나 시작하지 못했습니다. 청구는 진행하지 않았습니다."); }
+        finally { billingLock.current = false; setBillingBusy(false); }
+    }
+
+    async function refreshCheckout() {
+        if (!checkout || billingLock.current) return;
+        billingLock.current = true;
+        setBillingBusy(true);
+        try {
+            const result = await getCheckout(checkout.orderId);
+            setCheckout(result);
+            setSubscriptionMessage(checkoutMessage(result.status));
+            if (result.status === "SUCCEEDED") {
+                setData(await requestMyPage());
+                setExplanationUsage(await requestAiExplanationUsage());
+            }
+        } catch { setSubscriptionMessage("결제 상태를 확인하지 못했습니다. 다시 결제하지 말고 잠시 후 확인해주세요."); }
+        finally { billingLock.current = false; setBillingBusy(false); }
+    }
 
     async function handlePasswordChange(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
@@ -200,11 +247,21 @@ function MyPage() {
                                 <div className="mypage-subscription-action">
                                     <button
                                         type="button"
-                                        onClick={() => setSubscriptionMessage(
-                                            "구독 결제 기능은 준비 중입니다.",
-                                        )}>
+                                        disabled={billingBusy}
+                                        onClick={() => { void handleSubscription(); }}>
                                         구독하고 해설 한도 늘리기
                                     </button>
+                                    {checkout?.status === "READY" && <div>
+                                        <p>{checkout.orderName}: {checkout.amount.toLocaleString("ko-KR")}원 / 월</p>
+                                        <p>테스트 결제입니다. 승인 후 1개월간 PRO를 이용합니다. 자동 갱신 청구는 아직 실행되지 않습니다.</p>
+                                        <button disabled={billingBusy} onClick={() => { void confirmSubscription(); }}>
+                                            {billingBusy ? "처리 중..." : "금액 확인 및 카드 등록"}
+                                        </button>
+                                    </div>}
+                                    {checkout && checkout.status !== "READY" && <div>
+                                        <p>주문번호: {checkout.orderId}</p>
+                                        <button disabled={billingBusy} onClick={() => { void refreshCheckout(); }}>주문 상태 확인</button>
+                                    </div>}
                                     {subscriptionMessage && (
                                         <p role="status" className="mypage-message">
                                             {subscriptionMessage}

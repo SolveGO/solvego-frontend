@@ -14,6 +14,7 @@ import SignupPage from "./pages/auth/SignupPage/SignupPage";
 
 import AiPlayPage from "./pages/ai/AiPlayPage/AiPlayPage";
 import MyPage from "./pages/user/MyPage/MyPage";
+import BillingReturnPage from "./pages/billing/BillingReturnPage";
 import HomePage from "./pages/home/HomePage/HomePage";
 
 function App() {
@@ -32,6 +33,7 @@ function App() {
                 <Route path="/login" element={<LoginPage />} />
 
                 <Route path="/signup" element={<SignupPage />} />
+                <Route path="/billing/return" element={<ProtectedRoute><BillingReturnPage /></ProtectedRoute>} />
 
                 <Route
                     path="/mypage"

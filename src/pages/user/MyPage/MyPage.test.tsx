@@ -10,6 +10,15 @@ import {
 } from "../../../api/userApi";
 import { requestAiExplanationUsage } from "../../../api/aiApi";
 import MyPage from "./MyPage";
+import { prepareCheckout, getCheckout } from "../../../api/subscriptionApi";
+import { startBillingAuth } from "../../../billing/tossBilling";
+vi.mock("../../../api/subscriptionApi", async (original) => ({
+    ...await original<typeof import("../../../api/subscriptionApi")>(),
+    prepareCheckout: vi.fn(), getCheckout: vi.fn(),
+}));
+vi.mock("../../../billing/tossBilling", () => ({ startBillingAuth: vi.fn() }));
+const checkout = { orderId: "order-123", customerKey: "customer", orderName: "SolveGO PRO 1개월",
+    amount: 5000, status: "READY" as const, currentPeriodEndAt: null };
 
 vi.mock("../../../api/userApi", () => ({
     requestMyPage: vi.fn(),
@@ -62,6 +71,7 @@ function renderPage(logout = vi.fn().mockResolvedValue(undefined)) {
 describe("MyPage", () => {
     beforeEach(() => {
         vi.resetAllMocks();
+        vi.mocked(prepareCheckout).mockResolvedValue(checkout);
         vi.mocked(requestMyPage).mockResolvedValue(pageData);
         vi.mocked(requestAiExplanationUsage).mockResolvedValue(explanationUsage);
     });
@@ -96,8 +106,42 @@ describe("MyPage", () => {
         fireEvent.click(screen.getByRole("button", {
             name: "구독하고 해설 한도 늘리기",
         }));
-        expect(screen.getByText("구독 결제 기능은 준비 중입니다."))
-            .toBeInTheDocument();
+        expect(await screen.findByText(/5,000원/)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "금액 확인 및 카드 등록" }));
+        await waitFor(() => expect(startBillingAuth).toHaveBeenCalledWith(checkout));
+    });
+
+    it("중복 클릭은 준비 요청을 한 번만 전송한다", async () => {
+        vi.mocked(prepareCheckout).mockReturnValue(new Promise(() => {}));
+        renderPage();
+        const button = await screen.findByRole("button", { name: "구독하고 해설 한도 늘리기" });
+        fireEvent.click(button);
+        fireEvent.click(button);
+        expect(prepareCheckout).toHaveBeenCalledTimes(1);
+        expect(button).toBeDisabled();
+    });
+
+    it("불확실한 주문은 인증을 다시 시작하지 않고 상태만 조회한다", async () => {
+        vi.mocked(prepareCheckout).mockResolvedValue({ ...checkout, status: "UNKNOWN" });
+        vi.mocked(getCheckout).mockResolvedValue({ ...checkout, status: "SUCCEEDED" });
+        renderPage();
+        fireEvent.click(await screen.findByRole("button", { name: "구독하고 해설 한도 늘리기" }));
+        expect(await screen.findByText(/결제가 처리 중이거나/)).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "금액 확인 및 카드 등록" })).not.toBeInTheDocument();
+        vi.mocked(requestMyPage).mockResolvedValue({ ...pageData, plan: "PRO" });
+        vi.mocked(requestAiExplanationUsage).mockResolvedValue({ ...explanationUsage, dailyLimit: 30, remainingCount: 28 });
+        fireEvent.click(screen.getByRole("button", { name: "주문 상태 확인" }));
+        expect(await screen.findByText("PRO")).toBeInTheDocument();
+        await waitFor(() => expect(screen.getByText("일일 한도").nextElementSibling).toHaveTextContent("30회"));
+        expect(startBillingAuth).not.toHaveBeenCalled();
+    });
+
+    it("인증 취소를 표시한다", async () => {
+        vi.mocked(startBillingAuth).mockRejectedValue(new Error("cancelled"));
+        renderPage();
+        fireEvent.click(await screen.findByRole("button", { name: "구독하고 해설 한도 늘리기" }));
+        fireEvent.click(await screen.findByRole("button", { name: "금액 확인 및 카드 등록" }));
+        expect(await screen.findByText(/결제수단 인증이 취소되었거나/)).toBeInTheDocument();
     });
 
     it("PRO 플랜은 30회 한도를 표시하고 구독 버튼을 숨긴다", async () => {
