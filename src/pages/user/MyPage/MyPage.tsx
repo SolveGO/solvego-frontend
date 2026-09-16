@@ -93,11 +93,6 @@ function MyPage() {
         <div className="mypage">
             <h1>마이페이지</h1>
 
-            <div className="mypage-notice">
-                <strong>SolveGO는 현재 개발 및 테스트 중입니다.</strong>
-                <p>일부 기능은 변경될 수 있습니다.</p>
-            </div>
-
             {loadError && (
                 <p role="alert" className="mypage-message">
                     마이페이지 정보를 불러오지 못했습니다.

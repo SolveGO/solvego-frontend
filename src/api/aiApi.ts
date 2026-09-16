@@ -53,6 +53,14 @@ export type AiExplanation = {
         limitation: string;
         evidenceRefs: string[];
     };
+    usage: AiExplanationUsage;
+};
+
+export type AiExplanationUsage = {
+    usedCount: number;
+    remainingCount: number;
+    dailyLimit: number;
+    resetsAt: string;
 };
 
 export class AiApiError extends Error {
@@ -92,6 +100,12 @@ export async function requestAiExplanation(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ evidenceToken }),
     });
+    if (!response.ok) throw new AiApiError(response.status);
+    return response.json();
+}
+
+export async function requestAiExplanationUsage(): Promise<AiExplanationUsage> {
+    const response = await authFetch("/api/ai/game/explanation/usage");
     if (!response.ok) throw new AiApiError(response.status);
     return response.json();
 }

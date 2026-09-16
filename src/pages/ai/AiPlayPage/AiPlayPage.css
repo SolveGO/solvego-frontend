@@ -121,6 +121,23 @@
     cursor: pointer;
 }
 
+.ai-explanation-button:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
+.ai-explanation-usage,
+.ai-explanation-limit-message {
+    margin: 10px 0 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--dusk-blue);
+}
+
+.ai-explanation-limit-message {
+    color: #b91c1c;
+}
+
 .ai-explanation-content,
 .ai-explanation-text {
     display: grid;

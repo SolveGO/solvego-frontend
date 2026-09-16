@@ -10,36 +10,6 @@
     color: var(--ink-black);
 }
 
-/* 운영 전 안내 */
-
-.mypage-notice {
-    margin-bottom: 40px;
-    padding: 18px 20px;
-
-    border: 1px solid var(--alabaster-grey);
-    border-radius: 10px;
-
-    background: #f7f8fa;
-}
-
-.mypage-notice strong {
-    display: block;
-
-    margin-bottom: 6px;
-
-    font-size: 15px;
-
-    color: var(--ink-black);
-}
-
-.mypage-notice p {
-    margin: 0;
-
-    font-size: 14px;
-
-    color: var(--dusk-blue);
-}
-
 /* 공통 섹션 */
 
 .mypage-section {

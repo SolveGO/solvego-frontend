@@ -4,7 +4,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import AiPlayPage from "./AiPlayPage";
 
-import { AiApiError, requestAiExplanation, requestAiNextMove, type AiGameNextMoveResponse } from "../../../api/aiApi";
+import {
+    AiApiError,
+    requestAiExplanation,
+    requestAiExplanationUsage,
+    requestAiNextMove,
+    type AiGameNextMoveResponse,
+} from "../../../api/aiApi";
 
 import { playMove } from "../../../utils/goRules";
 
@@ -54,6 +60,7 @@ vi.mock("../../../api/aiApi", async () => {
         ...actual,
         requestAiNextMove: vi.fn(),
         requestAiExplanation: vi.fn(),
+        requestAiExplanationUsage: vi.fn(),
     };
 });
 
@@ -70,6 +77,12 @@ vi.mock("../../../utils/goRules", () => ({
 describe("AiPlayPage", () => {
     beforeEach(() => {
         vi.resetAllMocks();
+        vi.mocked(requestAiExplanationUsage).mockResolvedValue({
+            usedCount: 0,
+            remainingCount: 5,
+            dailyLimit: 5,
+            resetsAt: "2026-09-16T15:00:00Z",
+        });
 
         vi.mocked(playMove).mockImplementation(
             (blackStones, whiteStones, position, color) => {
@@ -219,6 +232,10 @@ describe("AiPlayPage", () => {
                 limitation: "낮은 탐색량의 결과입니다.",
                 evidenceRefs: ["c1", "c2"],
             },
+            usage: {
+                usedCount: 5, remainingCount: 0, dailyLimit: 5,
+                resetsAt: "2026-09-16T15:00:00Z",
+            },
         });
         render(<AiPlayPage />);
         fireEvent.click(screen.getByRole("button", { name: "바둑판 클릭" }));
@@ -236,6 +253,7 @@ describe("AiPlayPage", () => {
             { position: { x: 3, y: 15 }, label: "B" },
         ]);
         await screen.findByText("A 후보가 가장 높은 평가를 받았습니다.");
+        expect(screen.getByText(/오늘 5\/5회 사용/)).toHaveTextContent("0회 남음");
         expect(
             [...document.querySelectorAll(".ai-candidate-card strong")].map(
                 (candidate) => candidate.textContent?.trim(),
@@ -254,6 +272,32 @@ describe("AiPlayPage", () => {
         expect(JSON.parse(screen.getByTestId("candidate-markers").textContent!)).toHaveLength(2);
         expect(screen.getByText("A 후보가 가장 높은 평가를 받았습니다.")).toBeInTheDocument();
         expect(screen.queryByText(/방문 수/)).not.toBeInTheDocument();
+    });
+
+    it("오늘 해설 한도를 모두 사용하면 새 해설 요청을 막는다", async () => {
+        vi.mocked(requestAiExplanationUsage).mockResolvedValue({
+            usedCount: 5,
+            remainingCount: 0,
+            dailyLimit: 5,
+            resetsAt: "2026-09-16T15:00:00Z",
+        });
+        vi.mocked(requestAiNextMove).mockResolvedValue({
+            moveType: "PLAY", move: { x: 15, y: 15 },
+            winRate: 0.6, scoreLead: 1.5,
+            gameEnded: false, result: null, endReason: null,
+            evidenceToken: "new-evidence",
+            candidates: [
+                { id: "c1", rank: 1, moveType: "PLAY", move: { x: 15, y: 15 }, winRate: 0.6, scoreLead: 1.5, visits: 5, pv: [] },
+            ],
+        });
+        render(<AiPlayPage />);
+        fireEvent.click(screen.getByRole("button", { name: "바둑판 클릭" }));
+
+        const explainButton = await screen.findByRole("button", { name: "왜 이 수?" });
+        await screen.findByText(/오늘 5\/5회 사용/);
+        expect(explainButton).toBeDisabled();
+        expect(screen.getByText(/내일 다시 이용해주세요/)).toBeInTheDocument();
+        expect(requestAiExplanation).not.toHaveBeenCalled();
     });
 
     it("다음 사용자 착수는 이전 후보와 해설을 제거한다", async () => {
@@ -291,6 +335,10 @@ describe("AiPlayPage", () => {
                 summary: "이번 수의 AI 해설을 불러오지 못했습니다.",
                 comparison: "", pvExplanation: "",
                 limitation: "잠시 후 다시 시도해주세요.", evidenceRefs: ["c1"],
+            },
+            usage: {
+                usedCount: 1, remainingCount: 4, dailyLimit: 5,
+                resetsAt: "2026-09-16T15:00:00Z",
             },
         });
         render(<AiPlayPage />);
@@ -575,6 +623,12 @@ const boardText = () => screen.getByTestId("board").textContent;
 describe("AI 실패 복구", () => {
     beforeEach(() => {
         vi.resetAllMocks();
+        vi.mocked(requestAiExplanationUsage).mockResolvedValue({
+            usedCount: 0,
+            remainingCount: 5,
+            dailyLimit: 5,
+            resetsAt: "2026-09-16T15:00:00Z",
+        });
         vi.mocked(playMove).mockImplementation((blackStones, whiteStones, position, color) => ({
             blackStones: color === "BLACK" ? [...blackStones, position] : blackStones,
             whiteStones: color === "WHITE" ? [...whiteStones, position] : whiteStones,

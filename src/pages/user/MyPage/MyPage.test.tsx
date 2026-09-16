@@ -56,6 +56,7 @@ describe("MyPage", () => {
         renderPage();
 
         expect(await screen.findByText("solvego")).toBeInTheDocument();
+        expect(screen.queryByText(/현재 개발 및 테스트 중/)).not.toBeInTheDocument();
         expect(screen.getByText("2026년 1월 2일")).toBeInTheDocument();
         expect(screen.getByText("2")).toBeInTheDocument();
         expect(screen.getByText("3")).toBeInTheDocument();

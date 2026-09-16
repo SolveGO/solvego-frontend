@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AiApiError, requestAiExplanation, requestAiNextMove, type GameMove } from "./aiApi";
+import {
+    AiApiError,
+    requestAiExplanation,
+    requestAiExplanationUsage,
+    requestAiNextMove,
+    type GameMove,
+} from "./aiApi";
 
 import { authFetch } from "./api";
 
@@ -184,6 +190,10 @@ describe("requestAiExplanation", () => {
                 summary: "요약", comparison: "비교", pvExplanation: "진행",
                 limitation: "한계", evidenceRefs: ["c1"],
             },
+            usage: {
+                usedCount: 1, remainingCount: 4, dailyLimit: 5,
+                resetsAt: "2026-09-16T15:00:00Z",
+            },
         };
         vi.mocked(authFetch).mockResolvedValue({
             ok: true, status: 200, json: async () => responseData,
@@ -195,5 +205,18 @@ describe("requestAiExplanation", () => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ evidenceToken: "signed-token" }),
         });
+    });
+
+    it("오늘의 해설 사용량을 조회한다", async () => {
+        const usage = {
+            usedCount: 2, remainingCount: 3, dailyLimit: 5,
+            resetsAt: "2026-09-16T15:00:00Z",
+        };
+        vi.mocked(authFetch).mockResolvedValue({
+            ok: true, status: 200, json: async () => usage,
+        } as Response);
+
+        await expect(requestAiExplanationUsage()).resolves.toEqual(usage);
+        expect(authFetch).toHaveBeenCalledWith("/api/ai/game/explanation/usage");
     });
 });

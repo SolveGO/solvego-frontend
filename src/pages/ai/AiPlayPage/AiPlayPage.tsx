@@ -1,13 +1,15 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import GoBoard from "../../../components/GoBoard/GoBoard";
 
 import {
     AiApiError,
     requestAiExplanation,
+    requestAiExplanationUsage,
     requestAiNextMove,
     type AiCandidate,
     type AiExplanation,
+    type AiExplanationUsage,
     type AiGameNextMoveResponse,
     type GameEndReason,
     type GameMove,
@@ -242,6 +244,39 @@ function AiPlayPage() {
     const [showCandidateMarkers, setShowCandidateMarkers] = useState(false);
     const [explanationState, setExplanationState] =
         useState<ExplanationState>({ status: "IDLE" });
+    const [explanationUsage, setExplanationUsage] =
+        useState<AiExplanationUsage | null>(null);
+
+    useEffect(() => {
+        let active = true;
+        requestAiExplanationUsage()
+            .then((usage) => {
+                if (active) setExplanationUsage(usage);
+            })
+            .catch(() => {
+                // A later explanation request still receives server-enforced usage.
+            });
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!explanationUsage) return;
+
+        const resetDelay = new Date(explanationUsage.resetsAt).getTime() - Date.now();
+        if (!Number.isFinite(resetDelay) || resetDelay <= 0) return;
+
+        const timer = window.setTimeout(() => {
+            requestAiExplanationUsage()
+                .then(setExplanationUsage)
+                .catch(() => {
+                    // The backend remains authoritative if the refresh fails.
+                });
+        }, resetDelay + 1000);
+
+        return () => window.clearTimeout(timer);
+    }, [explanationUsage]);
 
     function getAiColor(currentPlayerColor: StoneColor): StoneColor {
         return currentPlayerColor === "BLACK" ? "WHITE" : "BLACK";
@@ -330,6 +365,7 @@ function AiPlayPage() {
         setExplanationState({ status: "LOADING", token });
         try {
             const data = await requestAiExplanation(token);
+            setExplanationUsage(data.usage);
             setExplanationState((current) =>
                 lastEvidenceToken === token && current.status === "LOADING"
                     ? data.source === "TEMPLATE"
@@ -341,10 +377,23 @@ function AiPlayPage() {
                         : { status: "SUCCESS", token, data }
                     : current,
             );
-        } catch {
+        } catch (error) {
+            if (error instanceof AiApiError && error.status === 429) {
+                try {
+                    setExplanationUsage(await requestAiExplanationUsage());
+                } catch {
+                    // The explanation error below remains the source of UI feedback.
+                }
+            }
             setExplanationState((current) =>
                 current.status === "LOADING" && current.token === token
-                    ? { status: "ERROR", token, message: "해설을 불러오지 못했습니다." }
+                    ? {
+                        status: "ERROR",
+                        token,
+                        message: error instanceof AiApiError && error.status === 429
+                            ? "오늘 사용할 수 있는 AI 해설을 모두 사용했습니다. 내일 다시 이용해주세요."
+                            : "해설을 불러오지 못했습니다.",
+                    }
                     : current,
             );
         }
@@ -361,6 +410,16 @@ function AiPlayPage() {
         setShowCandidateMarkers(true);
         void loadExplanation(lastEvidenceToken);
     }
+
+    const hasRequestedCurrentExplanation =
+        explanationState.status !== "IDLE" &&
+        explanationState.token === lastEvidenceToken;
+    const isExplanationLimitReached = explanationUsage?.remainingCount === 0;
+    const isExplanationButtonDisabled = Boolean(
+        isExplanationLimitReached &&
+        !hasRequestedCurrentExplanation &&
+        !showCandidateMarkers,
+    );
 
     function updateWinRate(aiWinRate: number) {
         const currentPlayerWinRate = 1 - aiWinRate;
@@ -778,9 +837,23 @@ function AiPlayPage() {
                             className="ai-explanation-button"
                             type="button"
                             onClick={handleExplain}
+                            disabled={isExplanationButtonDisabled}
                             aria-expanded={showCandidateMarkers}>
                             {showCandidateMarkers ? "해설 닫기" : "왜 이 수?"}
                         </button>
+
+                        {explanationUsage && (
+                            <p className="ai-explanation-usage" aria-live="polite">
+                                오늘 {explanationUsage.usedCount}/{explanationUsage.dailyLimit}회 사용
+                                · {explanationUsage.remainingCount}회 남음
+                            </p>
+                        )}
+
+                        {isExplanationButtonDisabled && (
+                            <p className="ai-explanation-limit-message">
+                                오늘 사용할 수 있는 AI 해설을 모두 사용했습니다. 내일 다시 이용해주세요.
+                            </p>
+                        )}
 
                         {showCandidateMarkers && (
                             <div className="ai-explanation-content">
