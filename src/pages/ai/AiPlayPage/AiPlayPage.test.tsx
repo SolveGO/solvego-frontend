@@ -223,6 +223,12 @@ describe("AiPlayPage", () => {
         render(<AiPlayPage />);
         fireEvent.click(screen.getByRole("button", { name: "바둑판 클릭" }));
         const explainButton = await screen.findByRole("button", { name: "왜 이 수?" });
+        const positionButton = screen.getByRole("button", { name: /형세/ });
+
+        expect(
+            positionButton.compareDocumentPosition(explainButton) &
+                Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
 
         fireEvent.click(explainButton);
         expect(JSON.parse(screen.getByTestId("candidate-markers").textContent!)).toEqual([
@@ -230,6 +236,11 @@ describe("AiPlayPage", () => {
             { position: { x: 3, y: 15 }, label: "B" },
         ]);
         await screen.findByText("A 후보가 가장 높은 평가를 받았습니다.");
+        expect(
+            [...document.querySelectorAll(".ai-candidate-card strong")].map(
+                (candidate) => candidate.textContent?.trim(),
+            ),
+        ).toEqual(["A", "B"]);
         expect(screen.queryByText("가능한 예상 진행입니다.")).not.toBeInTheDocument();
         expect(screen.queryByText("낮은 탐색량의 결과입니다.")).not.toBeInTheDocument();
         fireEvent.click(explainButton);

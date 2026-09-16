@@ -320,12 +320,6 @@ function AiPlayPage() {
         setExplanationState({ status: "IDLE" });
     }
 
-    function formatPosition(candidate: AiCandidate) {
-        if (candidate.moveType === "PASS" || candidate.move === null) return "PASS";
-        const columns = "ABCDEFGHJKLMNOPQRST";
-        return `${columns[candidate.move.x]}${19 - candidate.move.y}`;
-    }
-
     async function loadExplanation(token: string) {
         if (
             (explanationState.status === "LOADING" ||
@@ -714,58 +708,6 @@ function AiPlayPage() {
                 </div>
 
                 <div className="ai-play-side-panels">
-                {lastEvidenceToken && lastAiCandidates.length > 0 && !isAiThinking && (
-                    <section className="ai-explanation-panel">
-                        <button
-                            className="ai-explanation-button"
-                            type="button"
-                            onClick={handleExplain}
-                            aria-expanded={showCandidateMarkers}>
-                            {showCandidateMarkers ? "해설 닫기" : "왜 이 수?"}
-                        </button>
-
-                        {showCandidateMarkers && (
-                            <div className="ai-explanation-content">
-                                <div className="ai-candidate-list">
-                                    {lastAiCandidates.map((candidate) => (
-                                        <div className="ai-candidate-card" key={candidate.id}>
-                                            <strong>
-                                                {String.fromCharCode(64 + candidate.rank)} {formatPosition(candidate)}
-                                            </strong>
-                                            <span>예상 승률 {(candidate.winRate * 100).toFixed(1)}%</span>
-                                            <span>예상 집 차이 {candidate.scoreLead >= 0 ? "+" : ""}{candidate.scoreLead.toFixed(1)}</span>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {explanationState.status === "LOADING" && <p>해설을 만들고 있습니다.</p>}
-                                {explanationState.status === "ERROR" && (
-                                    <div role="alert">
-                                        <p>{explanationState.message}</p>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                if (lastEvidenceToken) {
-                                                    void loadExplanation(lastEvidenceToken);
-                                                }
-                                            }}>
-                                            다시 시도
-                                        </button>
-                                    </div>
-                                )}
-                                {explanationState.status === "SUCCESS" && (
-                                    <div className="ai-explanation-text">
-                                        <p>{explanationState.data.explanation.summary}</p>
-                                        {explanationState.data.explanation.comparison && (
-                                            <p>{explanationState.data.explanation.comparison}</p>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </section>
-                )}
-
                 <div
                     className={`position-panel ${
                         isPositionOpen ? "open" : "closed"
@@ -829,6 +771,58 @@ function AiPlayPage() {
                         </div>
                     )}
                 </div>
+
+                {lastEvidenceToken && lastAiCandidates.length > 0 && !isAiThinking && (
+                    <section className="ai-explanation-panel">
+                        <button
+                            className="ai-explanation-button"
+                            type="button"
+                            onClick={handleExplain}
+                            aria-expanded={showCandidateMarkers}>
+                            {showCandidateMarkers ? "해설 닫기" : "왜 이 수?"}
+                        </button>
+
+                        {showCandidateMarkers && (
+                            <div className="ai-explanation-content">
+                                <div className="ai-candidate-list">
+                                    {lastAiCandidates.map((candidate) => (
+                                        <div className="ai-candidate-card" key={candidate.id}>
+                                            <strong>
+                                                {String.fromCharCode(64 + candidate.rank)}
+                                            </strong>
+                                            <span>예상 승률 {(candidate.winRate * 100).toFixed(1)}%</span>
+                                            <span>예상 집 차이 {candidate.scoreLead >= 0 ? "+" : ""}{candidate.scoreLead.toFixed(1)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {explanationState.status === "LOADING" && <p>해설을 만들고 있습니다.</p>}
+                                {explanationState.status === "ERROR" && (
+                                    <div role="alert">
+                                        <p>{explanationState.message}</p>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (lastEvidenceToken) {
+                                                    void loadExplanation(lastEvidenceToken);
+                                                }
+                                            }}>
+                                            다시 시도
+                                        </button>
+                                    </div>
+                                )}
+                                {explanationState.status === "SUCCESS" && (
+                                    <div className="ai-explanation-text">
+                                        <p>{explanationState.data.explanation.summary}</p>
+                                        {explanationState.data.explanation.comparison && (
+                                            <p>{explanationState.data.explanation.comparison}</p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </section>
+                )}
                 </div>
             </div>
         </div>
