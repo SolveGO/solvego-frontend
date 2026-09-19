@@ -13,7 +13,16 @@ import {
     type AiExplanationUsage,
 } from "../../../api/aiApi";
 
-import { prepareCheckout, getCheckout, checkoutMessage, type Checkout } from "../../../api/subscriptionApi";
+import {
+    cancelAutoRenew,
+    checkoutMessage,
+    getCheckout,
+    getSubscription,
+    prepareCheckout,
+    reactivateAutoRenew,
+    type Checkout,
+    type SubscriptionInfo,
+} from "../../../api/subscriptionApi";
 import { startBillingAuth } from "../../../billing/tossBilling";
 import "./MyPage.css";
 
@@ -21,6 +30,15 @@ function formatJoinedAt(joinedAt: string) {
     return new Intl.DateTimeFormat("ko-KR", { dateStyle: "long" }).format(
         new Date(joinedAt),
     );
+}
+
+function formatSubscriptionDate(value: string) {
+    return new Intl.DateTimeFormat("ko-KR", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        timeZone: "Asia/Seoul",
+    }).format(new Date(value));
 }
 
 function MyPage() {
@@ -32,6 +50,8 @@ function MyPage() {
         useState<AiExplanationUsage | null>(null);
     const [usageLoadError, setUsageLoadError] = useState(false);
     const [checkout, setCheckout] = useState<Checkout | null>(null);
+    const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
+    const [subscriptionLoadError, setSubscriptionLoadError] = useState(false);
     const [billingBusy, setBillingBusy] = useState(false);
     const billingLock = useRef(false);
     const [subscriptionMessage, setSubscriptionMessage] = useState("");
@@ -42,7 +62,7 @@ function MyPage() {
     const [passwordMessage, setPasswordMessage] = useState("");
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState(false);
-    const currentPlan = data?.plan ?? "FREE";
+    const currentPlan = subscription?.plan ?? data?.plan ?? "FREE";
 
     useEffect(() => {
         let active = true;
@@ -57,6 +77,36 @@ function MyPage() {
             active = false;
         };
     }, []);
+
+    useEffect(() => {
+        let active = true;
+        getSubscription()
+            .then((response) => {
+                if (active) setSubscription(response);
+            })
+            .catch(() => {
+                if (active) setSubscriptionLoadError(true);
+            });
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    async function refreshSubscriptionState() {
+        const [myPage, usage, currentSubscription] = await Promise.allSettled([
+            requestMyPage(),
+            requestAiExplanationUsage(),
+            getSubscription(),
+        ]);
+        if (myPage.status === "fulfilled") setData(myPage.value);
+        if (usage.status === "fulfilled") setExplanationUsage(usage.value);
+        if (currentSubscription.status === "fulfilled") {
+            setSubscription(currentSubscription.value);
+            setSubscriptionLoadError(false);
+        } else {
+            setSubscriptionLoadError(true);
+        }
+    }
 
     useEffect(() => {
         if (!explanationUsage) return;
@@ -97,8 +147,7 @@ function MyPage() {
             setCheckout(prepared);
             if (prepared.status !== "READY") setSubscriptionMessage(checkoutMessage(prepared.status));
             if (prepared.status === "SUCCEEDED") {
-                setData(await requestMyPage());
-                setExplanationUsage(await requestAiExplanationUsage());
+                await refreshSubscriptionState();
             }
         } catch { setSubscriptionMessage("구독 결제를 준비하지 못했습니다. 결제 설정 또는 연결 상태를 확인해주세요."); }
         finally { billingLock.current = false; setBillingBusy(false); }
@@ -122,11 +171,46 @@ function MyPage() {
             setCheckout(result);
             setSubscriptionMessage(checkoutMessage(result.status));
             if (result.status === "SUCCEEDED") {
-                setData(await requestMyPage());
-                setExplanationUsage(await requestAiExplanationUsage());
+                await refreshSubscriptionState();
             }
         } catch { setSubscriptionMessage("결제 상태를 확인하지 못했습니다. 다시 결제하지 말고 잠시 후 확인해주세요."); }
         finally { billingLock.current = false; setBillingBusy(false); }
+    }
+
+    async function handleCancelAutoRenew() {
+        if (billingLock.current || !window.confirm(
+            "자동결제를 해지하시겠습니까? 현재 결제 기간이 끝날 때까지 PRO를 이용할 수 있습니다.",
+        )) return;
+        billingLock.current = true;
+        setBillingBusy(true);
+        setSubscriptionMessage("");
+        try {
+            const updated = await cancelAutoRenew();
+            setSubscription(updated);
+            setSubscriptionMessage("자동결제 해지를 예약했습니다. 현재 이용 기간까지 PRO가 유지됩니다.");
+        } catch {
+            setSubscriptionMessage("자동결제 해지를 완료하지 못했습니다. 잠시 후 다시 시도해주세요.");
+        } finally {
+            billingLock.current = false;
+            setBillingBusy(false);
+        }
+    }
+
+    async function handleReactivateAutoRenew() {
+        if (billingLock.current) return;
+        billingLock.current = true;
+        setBillingBusy(true);
+        setSubscriptionMessage("");
+        try {
+            const updated = await reactivateAutoRenew();
+            setSubscription(updated);
+            setSubscriptionMessage("자동결제를 다시 활성화했습니다.");
+        } catch {
+            setSubscriptionMessage("자동결제를 다시 활성화하지 못했습니다.");
+        } finally {
+            billingLock.current = false;
+            setBillingBusy(false);
+        }
     }
 
     async function handlePasswordChange(e: React.FormEvent<HTMLFormElement>) {
@@ -215,6 +299,39 @@ function MyPage() {
                                 </strong>
                             </div>
 
+                            {subscription && currentPlan === "PRO" && (
+                                <div className="mypage-subscription-details">
+                                    {subscription.currentPeriodStartAt && subscription.currentPeriodEndAt && (
+                                        <div>
+                                            <span>현재 이용 기간</span>
+                                            <strong>
+                                                {formatSubscriptionDate(subscription.currentPeriodStartAt)} ~ {formatSubscriptionDate(subscription.currentPeriodEndAt)}
+                                            </strong>
+                                        </div>
+                                    )}
+                                    <div>
+                                        <span>자동결제</span>
+                                        <strong>
+                                            {subscription.cancelAtPeriodEnd
+                                                ? "해지 예정"
+                                                : subscription.autoRenew ? "사용 중" : "사용 안 함"}
+                                        </strong>
+                                    </div>
+                                    {subscription.autoRenew && !subscription.cancelAtPeriodEnd && subscription.nextBillingAt && (
+                                        <div>
+                                            <span>다음 결제일</span>
+                                            <strong>{formatSubscriptionDate(subscription.nextBillingAt)}</strong>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {subscriptionLoadError && (
+                                <p role="alert" className="mypage-message">
+                                    구독 상세 정보를 불러오지 못했습니다.
+                                </p>
+                            )}
+
                             {explanationUsage && (
                                 <div className="mypage-explanation-stats">
                                     <div>
@@ -247,13 +364,16 @@ function MyPage() {
                                 <div className="mypage-subscription-action">
                                     <button
                                         type="button"
-                                        disabled={billingBusy}
+                                        disabled={billingBusy || checkout?.status === "READY"
+                                            || checkout?.status === "PROCESSING" || checkout?.status === "UNKNOWN"}
                                         onClick={() => { void handleSubscription(); }}>
-                                        구독하고 해설 한도 늘리기
+                                        {checkout?.status === "FAILED"
+                                            ? "결제 다시 준비하기"
+                                            : "구독하고 해설 한도 늘리기"}
                                     </button>
                                     {checkout?.status === "READY" && <div>
                                         <p>{checkout.orderName}: {checkout.amount.toLocaleString("ko-KR")}원 / 월</p>
-                                        <p>테스트 결제입니다. 승인 후 1개월간 PRO를 이용합니다. 자동 갱신 청구는 아직 실행되지 않습니다.</p>
+                                        <p>테스트 결제입니다. 승인 후 PRO가 활성화되고 매월 자동결제됩니다.</p>
                                         <button disabled={billingBusy} onClick={() => { void confirmSubscription(); }}>
                                             {billingBusy ? "처리 중..." : "금액 확인 및 카드 등록"}
                                         </button>
@@ -262,6 +382,39 @@ function MyPage() {
                                         <p>주문번호: {checkout.orderId}</p>
                                         <button disabled={billingBusy} onClick={() => { void refreshCheckout(); }}>주문 상태 확인</button>
                                     </div>}
+                                    {subscriptionMessage && (
+                                        <p role="status" className="mypage-message">
+                                            {subscriptionMessage}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
+                            {currentPlan === "PRO" && subscription && (
+                                <div className="mypage-subscription-action">
+                                    {subscription.cancelAtPeriodEnd ? (
+                                        <>
+                                            {subscription.currentPeriodEndAt && (
+                                                <p className="mypage-cancel-notice">
+                                                    자동결제 해지 예정 · {formatSubscriptionDate(subscription.currentPeriodEndAt)}까지 PRO 이용 가능
+                                                </p>
+                                            )}
+                                            <button
+                                                type="button"
+                                                disabled={billingBusy}
+                                                onClick={() => { void handleReactivateAutoRenew(); }}>
+                                                자동결제 다시 활성화
+                                            </button>
+                                        </>
+                                    ) : subscription.autoRenew ? (
+                                        <button
+                                            type="button"
+                                            className="mypage-cancel-button"
+                                            disabled={billingBusy}
+                                            onClick={() => { void handleCancelAutoRenew(); }}>
+                                            자동결제 해지
+                                        </button>
+                                    ) : null}
                                     {subscriptionMessage && (
                                         <p role="status" className="mypage-message">
                                             {subscriptionMessage}
